@@ -15,13 +15,26 @@ import {
     FlatList,
     Image,
     Linking,
+    Platform,
     Share,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+let MapView: any = null;
+let Marker: any = null;
+let PROVIDER_GOOGLE: any = null;
+
+if (Platform.OS !== 'web') {
+    const Maps = require('react-native-maps');
+    MapView = Maps.default;
+    Marker = Maps.Marker;
+    PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+}
+import { geminiService } from '../../src/services/gemini';
 import { formatArea, formatPrice, formatWhatsAppNumber, properties, timeAgo } from '../../src/services/appwrite';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
 import { Property } from '../../src/types';
@@ -34,6 +47,14 @@ export default function PropertyDetailScreen() {
     const [property, setProperty] = useState<Property | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+    const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const [loadingSummary, setLoadingSummary] = useState(false);
+
+    // AI Market Forecast State
+    const [aiStats, setAiStats] = useState<{ vastuScore: number; forecast?: { year: number, growthPct: number, priceStr: string }[] } | null>(null);
+    const [loadingForecast, setLoadingForecast] = useState(false);
+
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const scrollY = useRef(new Animated.Value(0)).current;
@@ -41,7 +62,11 @@ export default function PropertyDetailScreen() {
     useEffect(() => {
         if (id) {
             properties.getById(id)
-                .then(setProperty)
+                .then((prop) => {
+                    setProperty(prop);
+
+                    // AI load triggers have been detached to manual buttons
+                })
                 .catch((err) => {
                     console.error('Failed to load property:', err);
                     Alert.alert('Error', 'Failed to load property details.');
@@ -95,6 +120,32 @@ export default function PropertyDetailScreen() {
         }
     };
 
+    const handleGenerateSummary = async () => {
+        if (!property) return;
+        setLoadingSummary(true);
+        try {
+            const summary = await geminiService.generatePropertySummary(property);
+            setAiSummary(summary);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoadingSummary(false);
+        }
+    };
+
+    const handleGenerateForecast = async () => {
+        if (!property) return;
+        setLoadingForecast(true);
+        try {
+            const stats = await geminiService.generateVastuAndGrowth(property);
+            setAiStats(stats);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoadingForecast(false);
+        }
+    };
+
     const handleShare = async () => {
         try {
             await Share.share({
@@ -119,96 +170,171 @@ export default function PropertyDetailScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Floating Header */}
-            <Animated.View style={[styles.floatingHeader, { opacity: headerOpacity, paddingTop: insets.top }]}>
-                <View style={styles.floatingHeaderContent}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.floatingBackButton}>
-                        <Ionicons name="arrow-back" size={20} color={Colors.text} />
-                    </TouchableOpacity>
-                    <Text style={styles.floatingTitle} numberOfLines={1}>{property.title}</Text>
-                    <TouchableOpacity onPress={handleShare} style={styles.floatingBackButton}>
-                        <Ionicons name="share-outline" size={20} color={Colors.text} />
-                    </TouchableOpacity>
-                </View>
-            </Animated.View>
-
             <Animated.ScrollView
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 120, paddingTop: insets.top + Spacing.xl }}
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
                     { useNativeDriver: true }
                 )}
                 scrollEventThrottle={16}
             >
-                {/* Image Gallery */}
-                <View style={styles.imageSection}>
-                    {imageUrls.length > 0 ? (
-                        <FlatList
-                            horizontal
-                            pagingEnabled
-                            showsHorizontalScrollIndicator={false}
-                            data={imageUrls}
-                            keyExtractor={(_, i) => String(i)}
-                            onMomentumScrollEnd={(e) => {
-                                const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-                                setActiveImageIndex(idx);
-                            }}
-                            renderItem={({ item }) => (
-                                <Image source={{ uri: item }} style={styles.mainImage} />
-                            )}
-                        />
-                    ) : (
-                        <LinearGradient
-                            colors={[Colors.surfaceElevated, Colors.surfaceBright]}
-                            style={styles.imagePlaceholder}
-                        >
-                            <Ionicons name="image-outline" size={64} color={Colors.textMuted} />
-                            <Text style={styles.imagePlaceholderText}>No Photos</Text>
-                        </LinearGradient>
-                    )}
+                {/* Back Button matching web: <button id="detail-close-btn" class="fixed top-6 left-8 text-white bg-black/30 backdrop-blur-sm hover:bg-black/50 p-3 rounded-full z-50 transition-colors"> */}
+                <TouchableOpacity onPress={() => router.back()} style={styles.webBackButton}>
+                    <Ionicons name="arrow-back" size={24} color="#FFF" />
+                </TouchableOpacity>
 
-                    {/* Back & Share buttons over image */}
-                    <View style={[styles.imageOverlay, { paddingTop: insets.top + Spacing.md }]}>
-                        <TouchableOpacity style={styles.overlayButton} onPress={() => router.back()}>
-                            <Ionicons name="arrow-back" size={22} color="#FFF" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.overlayButton} onPress={handleShare}>
-                            <Ionicons name="share-outline" size={22} color="#FFF" />
-                        </TouchableOpacity>
-                    </View>
+                {/* Compare Properties Floating Header Action */}
+                <TouchableOpacity onPress={() => router.push('/compare')} style={styles.webCompareButton}>
+                    <Ionicons name="git-compare-outline" size={24} color="#FFF" />
+                </TouchableOpacity>
 
-                    {/* Image Indicators */}
-                    {imageUrls.length > 1 && (
-                        <View style={styles.indicators}>
-                            {imageUrls.map((_, i) => (
-                                <View
-                                    key={i}
-                                    style={[styles.indicator, i === activeImageIndex && styles.indicatorActive]}
-                                />
-                            ))}
-                        </View>
-                    )}
-
-                    {/* Price overlay */}
-                    <View style={styles.priceOverlay}>
-                        <LinearGradient
-                            colors={[Colors.primary, Colors.primaryDark]}
-                            style={styles.priceGradient}
-                        >
-                            <Text style={styles.priceText}>{formatPrice(property.price)}</Text>
-                        </LinearGradient>
-                    </View>
-                </View>
-
-                {/* Content */}
                 <View style={styles.content}>
-                    {/* Title & Verified */}
-                    <View style={styles.titleRow}>
-                        <Text style={styles.title}>{property.title}</Text>
-                        {property.verified && (
-                            <View style={styles.verifiedBadge}>
-                                <Ionicons name="shield-checkmark" size={16} color={Colors.success} />
-                                <Text style={styles.verifiedText}>Verified</Text>
+                    {/* Top Section: Image Gallery (Web layout) */}
+                    <View style={styles.webImageSection}>
+                        {imageUrls.length > 0 ? (
+                            <>
+                                <Image source={{ uri: imageUrls[activeImageIndex] }} style={styles.webMainImage} />
+                                {/* Thumbnails */}
+                                {imageUrls.length > 1 && (
+                                    <View style={styles.webThumbnailsContainer}>
+                                        {imageUrls.map((url, i) => (
+                                            <TouchableOpacity
+                                                key={i}
+                                                onPress={() => setActiveImageIndex(i)}
+                                                style={[
+                                                    styles.webThumbnailWrapper,
+                                                    i === activeImageIndex && styles.webThumbnailActive
+                                                ]}
+                                            >
+                                                <Image source={{ uri: url }} style={styles.webThumbnailImage} />
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
+                            </>
+                        ) : (
+                            <LinearGradient
+                                colors={[Colors.surfaceElevated, Colors.surfaceBright]}
+                                style={styles.webMainImage}
+                            >
+                                <Ionicons name="image-outline" size={64} color={Colors.textMuted} />
+                                <Text style={styles.imagePlaceholderText}>No Photos</Text>
+                            </LinearGradient>
+                        )}
+                    </View>
+
+                    {/* Details Section (Web layout) */}
+                    <View style={styles.webHeaderRow}>
+                        <View style={styles.webTitleBlock}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                                <Text style={styles.webLocationTitle}>{property.location}</Text>
+                                <Ionicons name="location-outline" size={20} color={Colors.primary} />
+                            </View>
+                            <Text style={styles.webCitySubtitle}>{property.city}</Text>
+                        </View>
+
+                        {/* Verified Badge */}
+                        {property.verified ? (
+                            <View style={styles.webVerifiedBadge}>
+                                <Ionicons name="shield-checkmark" size={16} color="#FFF" />
+                                <Text style={styles.webVerifiedText}>Verified</Text>
+                            </View>
+                        ) : (
+                            <View style={[styles.webVerifiedBadge, { backgroundColor: Colors.surfaceElevated }]}>
+                                <Ionicons name="shield-checkmark-outline" size={16} color={Colors.textMuted} />
+                                <Text style={[styles.webVerifiedText, { color: Colors.textMuted }]}>Unverified</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: Spacing.xl }}>
+                        <Text style={styles.webPriceText}>{formatPrice(property.price)}</Text>
+                        {property.status && (
+                            <View style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: property.status.toLowerCase().includes('rent') ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)', borderRadius: 8, borderWidth: 1, borderColor: property.status.toLowerCase().includes('rent') ? '#3B82F6' : '#10B981' }}>
+                                <Text style={{ ...Typography.captionBold, color: property.status.toLowerCase().includes('rent') ? '#60A5FA' : Colors.success }}>{property.status}</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* AI Feature Cards Layout */}
+
+                    {/* Dark Navy AI Summary Block */}
+                    <View style={[styles.webAiSummaryCard, { backgroundColor: '#0F172A', borderColor: '#1E293B', borderWidth: 1 }]}>
+                        <View style={[styles.webAiSummaryHeader, { justifyContent: 'space-between' }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexShrink: 1, paddingRight: Spacing.sm }}>
+                                <Ionicons name="sparkles" size={20} color="#10B981" />
+                                <Text style={[styles.webAiSummaryTitle, { color: '#FFF', flexShrink: 1 }]} numberOfLines={1}>AI Smart Summary</Text>
+                            </View>
+                            {!aiSummary && (
+                                <TouchableOpacity
+                                    style={{ backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.sm, flexShrink: 0 }}
+                                    onPress={handleGenerateSummary}
+                                    disabled={loadingSummary}
+                                >
+                                    {loadingSummary ? <ActivityIndicator size="small" color="#0F172A" /> : <Text style={{ ...Typography.captionBold, color: '#0F172A' }}>Generate Summary</Text>}
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {aiSummary ? (
+                            <Text style={[styles.webAiSummaryText, { color: '#CBD5E1', marginTop: Spacing.md }]}>
+                                {aiSummary}
+                            </Text>
+                        ) : (
+                            <Text style={[styles.webAiSummaryText, { color: '#94A3B8', marginTop: Spacing.md }]}>
+                                Get a quick AI-powered breakdown of this property's potential, pros, and cons.
+                            </Text>
+                        )}
+                    </View>
+
+                    {/* Dark Navy Market Forecast Block */}
+                    <View style={[styles.webAiSummaryCard, { backgroundColor: '#0F172A', borderColor: '#1E293B', borderWidth: 1, marginTop: Spacing.lg }]}>
+                        <View style={[styles.webAiSummaryHeader, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                            <View style={{ flexShrink: 1, paddingRight: Spacing.sm }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 4 }}>
+                                    <Ionicons name="trending-up" size={20} color="#10B981" />
+                                    <Text style={[styles.webAiSummaryTitle, { color: '#FFF', flexShrink: 1 }]} numberOfLines={1}>Market Forecast</Text>
+                                </View>
+                                <Text style={{ ...Typography.caption, color: '#94A3B8' }}>AI-Powered Price Prediction</Text>
+                            </View>
+
+                            {!aiStats && (
+                                <TouchableOpacity
+                                    style={{ backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 8, borderRadius: BorderRadius.md, flexShrink: 0 }}
+                                    onPress={handleGenerateForecast}
+                                    disabled={loadingForecast}
+                                >
+                                    {loadingForecast ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={{ ...Typography.bodyBold, color: '#FFF' }}>Analyze Now</Text>}
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Expandable Forecast Grid */}
+                        {aiStats && aiStats.forecast && (
+                            <View style={{ marginTop: Spacing.xl }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.sm }}>
+                                    {aiStats.forecast.map((forecastItem, idx) => (
+                                        <View key={idx} style={{ alignItems: 'center' }}>
+                                            <Text style={{ ...Typography.bodyBold, color: '#10B981', marginBottom: 2 }}>{forecastItem.priceStr}</Text>
+                                            <Text style={{ ...Typography.tiny, color: '#34D399', fontWeight: 'bold' }}>+{forecastItem.growthPct}%</Text>
+
+                                            {/* Stylized Neon Underline */}
+                                            <LinearGradient
+                                                colors={['#10B981', '#047857']}
+                                                style={{ height: 6, width: 60, borderRadius: 3, marginTop: Spacing.sm, marginBottom: Spacing.md }}
+                                            />
+
+                                            <Text style={{ ...Typography.captionBold, color: '#94A3B8' }}>{forecastItem.year}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+
+                                <View style={{ backgroundColor: '#1E293B', padding: Spacing.md, borderRadius: BorderRadius.md, marginTop: Spacing.xl, alignItems: 'center' }}>
+                                    <Text style={{ ...Typography.caption, color: '#94A3B8', textAlign: 'center' }}>
+                                        Estimated market value based on current growth patterns.
+                                    </Text>
+                                </View>
                             </View>
                         )}
                     </View>
@@ -224,11 +350,84 @@ export default function PropertyDetailScreen() {
                         ))}
                     </View>
 
+                    {/* Legal & Documents */}
+                    <View style={styles.section}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md }}>
+                            <Ionicons name="document-text" size={24} color={Colors.primary} />
+                            <Text style={styles.sectionTitle}>Legal & Documents</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                            <View style={[styles.detailItem, property.aadhaar_url ? { borderColor: Colors.success } : {}]}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={styles.detailLabel}>Aadhaar Card</Text>
+                                    <Ionicons name={property.aadhaar_url ? "shield-checkmark" : "shield-half-outline"} size={16} color={property.aadhaar_url ? Colors.success : Colors.textMuted} />
+                                </View>
+                                <Text style={styles.detailValue}>{property.aadhaar_url ? 'Verified' : 'Pending'}</Text>
+                            </View>
+                            <View style={[styles.detailItem, property.sev_twelve_url ? { borderColor: Colors.success } : {}]}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={styles.detailLabel}>7/12 & 8A Extract</Text>
+                                    <Ionicons name={property.sev_twelve_url ? "shield-checkmark" : "shield-half-outline"} size={16} color={property.sev_twelve_url ? Colors.success : Colors.textMuted} />
+                                </View>
+                                <Text style={styles.detailValue}>{property.sev_twelve_url ? 'Verified' : 'Pending'}</Text>
+                            </View>
+                        </View>
+                    </View>
+
                     {/* Description */}
                     {property.description && (
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>About this Property</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md }}>
+                                <Ionicons name="information-circle" size={24} color={Colors.primary} />
+                                <Text style={styles.sectionTitle}>About this Property</Text>
+                            </View>
                             <Text style={styles.description}>{property.description}</Text>
+                        </View>
+                    )}
+
+                    {/* INTERACTIVE MAP COMPONENT (Native Only) */}
+                    {property.latitude && property.longitude && Platform.OS !== 'web' && MapView ? (
+                        <View style={styles.mapContainerWebWrapper}>
+                            <Text style={styles.sectionTitle}>Location map</Text>
+                            <View style={styles.mapBoxContainer}>
+                                <MapView
+                                    provider={PROVIDER_GOOGLE}
+                                    style={styles.mapViewInstance}
+                                    initialRegion={{
+                                        latitude: property.latitude,
+                                        longitude: property.longitude,
+                                        latitudeDelta: 0.005,
+                                        longitudeDelta: 0.005,
+                                    }}
+                                >
+                                    <Marker
+                                        coordinate={{ latitude: property.latitude, longitude: property.longitude }}
+                                        title={property.title || property.location}
+                                        description={formatPrice(property.price)}
+                                        pinColor={Colors.primary}
+                                    />
+                                </MapView>
+                            </View>
+                            <Text style={styles.mapContextSubtext}>
+                                <Ionicons name="information-circle-outline" size={14} color="#64748B" /> Exact location point may vary slightly based on listed coordinates.
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.mapContainerWebWrapper}>
+                            <Text style={styles.sectionTitle}>Location map</Text>
+                            <View style={[styles.mapBoxContainer, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' }]}>
+                                {Platform.OS === 'web' ? (
+                                    <>
+                                        <Ionicons name="laptop-outline" size={48} color="#E2E8F0" style={{ marginBottom: Spacing.sm }} />
+                                        <Text style={{ fontFamily: 'Outfit-Medium', color: '#94A3B8' }}>Interactive Map available on Mobile App</Text>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Ionicons name="map-sharp" size={48} color="#E2E8F0" style={{ marginBottom: Spacing.sm }} />
+                                        <Text style={{ fontFamily: 'Outfit-Medium', color: '#94A3B8' }}>Map coordinates unavailable</Text>
+                                    </>
+                                )}
+                            </View>
                         </View>
                     )}
 
@@ -291,106 +490,138 @@ const styles = StyleSheet.create({
     errorText: { ...Typography.h3, color: Colors.textMuted },
     backLink: { ...Typography.bodyBold, color: Colors.primary },
 
-    // Floating Header
-    floatingHeader: {
+    // Web Layout Matching Styles
+    webBackButton: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: Colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.glassBorder,
-        zIndex: 100,
-    },
-    floatingHeaderContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.md,
-        gap: Spacing.md,
-    },
-    floatingBackButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: Colors.glass,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    floatingTitle: { ...Typography.bodyBold, color: Colors.text, flex: 1 },
-
-    // Image Section
-    imageSection: { height: IMAGE_HEIGHT, position: 'relative' },
-    mainImage: { width, height: IMAGE_HEIGHT, resizeMode: 'cover' },
-    imagePlaceholder: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: Spacing.md,
-    },
-    imagePlaceholderText: { ...Typography.caption, color: Colors.textMuted },
-    imageOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: Spacing.lg,
-    },
-    overlayButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        top: 24,
+        left: 24,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 50,
     },
-    indicators: {
+    webCompareButton: {
         position: 'absolute',
-        bottom: 60,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
+        top: 24,
+        right: Spacing.xl,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
-        gap: Spacing.xs,
+        alignItems: 'center',
+        zIndex: 50,
     },
-    indicator: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255,255,255,0.4)',
-    },
-    indicatorActive: { backgroundColor: '#FFF', width: 20 },
-    priceOverlay: {
-        position: 'absolute',
-        bottom: Spacing.lg,
-        left: Spacing.lg,
-    },
-    priceGradient: {
-        paddingHorizontal: Spacing.xl,
-        paddingVertical: Spacing.md,
-        borderRadius: BorderRadius.md,
+    content: { padding: Spacing.xl },
+
+    webImageSection: { marginBottom: Spacing.xl },
+    webMainImage: {
+        width: '100%',
+        height: height * 0.4,
+        borderRadius: BorderRadius.lg,
+        resizeMode: 'cover',
         ...Shadows.md,
     },
-    priceText: { ...Typography.price, color: '#FFF' },
+    webThumbnailsContainer: {
+        flexDirection: 'row',
+        marginTop: Spacing.sm,
+        gap: Spacing.xs,
+    },
+    webThumbnailWrapper: {
+        flex: 1,
+        aspectRatio: 1.5,
+        borderRadius: BorderRadius.md,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    webThumbnailActive: { borderColor: Colors.primary },
+    webThumbnailImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+    imagePlaceholderText: { ...Typography.caption, color: Colors.textMuted },
 
-    // Content
-    content: { padding: Spacing.xl, paddingBottom: 120 },
-    titleRow: { marginBottom: Spacing.xl },
-    title: { ...Typography.h1, color: Colors.text, marginBottom: Spacing.sm },
-    verifiedBadge: {
+    webHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        paddingBottom: Spacing.md,
+    },
+    // MAP STYLES
+    mapContainerWebWrapper: {
+        marginBottom: Spacing.xxl + Spacing.lg,
+    },
+    mapBoxContainer: {
+        height: 250,
+        width: '100%',
+        borderRadius: BorderRadius.xl,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        ...Shadows.md,
+    },
+    mapViewInstance: {
+        width: '100%',
+        height: '100%',
+    },
+    mapContextSubtext: {
+        ...Typography.caption,
+        color: '#64748B',
+        marginTop: Spacing.sm,
+        marginLeft: Spacing.xs,
+    },
+    webTitleBlock: { flex: 1, paddingRight: Spacing.md },
+    webLocationTitle: { ...Typography.h1, color: Colors.text },
+    webCitySubtitle: { ...Typography.body, color: Colors.textSecondary, marginTop: Spacing.xs },
+
+    webVerifiedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: Spacing.xs,
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        alignSelf: 'flex-start',
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs,
+        backgroundColor: Colors.success,
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 4,
         borderRadius: BorderRadius.full,
+        gap: 4,
     },
-    verifiedText: { ...Typography.captionBold, color: Colors.success },
+    webVerifiedText: { ...Typography.captionBold, color: '#FFF' },
+
+    webPriceText: { ...Typography.price, color: Colors.primary, fontSize: 36, marginBottom: Spacing.xl },
+
+    webAIGrid: {
+        flexDirection: 'row',
+        gap: Spacing.md,
+        marginBottom: Spacing.xl,
+    },
+    webAiCard: {
+        flex: 1,
+        padding: Spacing.lg,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    webAiGrowth: {
+        backgroundColor: '#14532D', // Solid green-900
+        borderColor: '#22C55E',   // Solid green-500
+    },
+    webAiVastu: {
+        backgroundColor: '#713F12', // Solid yellow-900
+        borderColor: '#EAB308',    // Solid yellow-500
+    },
+    webAiCardTitle: { ...Typography.captionBold, color: '#FFF', opacity: 0.9, marginBottom: 4 },
+    webAiCardValue: { ...Typography.h3, color: '#FFF' },
+
+    webAiSummaryCard: {
+        padding: Spacing.lg,
+        backgroundColor: '#0F172A', // Solid slate-900
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: '#1E293B', // Solid slate-800
+        marginBottom: Spacing.xxl,
+    },
+    webAiSummaryHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+    webAiSummaryTitle: { ...Typography.h3, color: '#F8FAFC' }, // slate-50
+    webAiSummaryText: { ...Typography.body, color: '#CBD5E1', lineHeight: 24 }, // slate-300
 
     detailsGrid: {
         flexDirection: 'row',

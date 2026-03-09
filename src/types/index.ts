@@ -6,13 +6,39 @@ export interface Property {
     $id: string;
     title: string;
     price: number;
-    area: number | string;
+    area: number;
     type: string;
     location: string;
+    city?: string;
     description?: string;
     vastu?: string;
     verified?: boolean;
     images?: string[];
+
+    // Mapped from DB images to match exact schema
+    landmark?: string;
+    PinLocation?: string;
+    userId?: string;
+    documents?: string[];
+    AadharCard?: string[];
+    ai_summary?: string;
+    ai_forecast?: string;
+    state?: string;
+    pincode?: string;
+    status?: string;
+    views?: number;
+    favorites?: number;
+    propertyType?: string;
+    amenities?: string[];
+    propertyId?: string;
+    Extract?: string[];
+    owner_id?: string[];
+    owner_name?: string;
+
+    // Document Verification UI URLs
+    aadhaar_url?: string;
+    sev_twelve_url?: string;
+
     latitude?: number;
     longitude?: number;
     $collectionId?: string;
@@ -150,16 +176,16 @@ export interface DashboardProfile {
 // ============================================================================
 
 export const PROPERTY_TYPES = [
-    'Residential Plot',
-    'Commercial Plot',
-    'Agricultural Land',
-    'Industrial Plot',
-    'Farm House',
-    'Flat / Apartment',
-    'Villa',
-    'Office Space',
-    'Shop / Showroom',
-    'Warehouse',
+    'residential',
+    'commercial',
+    'agricultural',
+    'industrial',
+    'farm house',
+    'flat / apartment',
+    'villa',
+    'office space',
+    'shop / showroom',
+    'warehouse',
 ] as const;
 
 export interface SearchFilters {

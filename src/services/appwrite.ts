@@ -2,7 +2,8 @@
 // 🔌 APPWRITE SERVICE LAYER FOR REACT NATIVE
 // ============================================================================
 
-import { Account, Client, Databases, ID, Query, Storage } from 'appwrite';
+import { Account, Client, Databases, ID, Query, Storage, Permission, Role } from 'appwrite';
+import { Platform } from 'react-native';
 import { ENV } from '../config/env';
 import { Lead, Property, UserPrefs, UserRole } from '../types';
 
@@ -26,10 +27,17 @@ const BUCKET = ENV.appwrite.buckets;
 
 export const auth = {
     async login(email: string, password: string) {
+        try {
+            await account.deleteSession('current');
+        } catch { /* ignore if no session */ }
         return account.createEmailPasswordSession(email, password);
     },
 
     async signup(email: string, password: string, name: string) {
+        try {
+            await account.deleteSession('current');
+        } catch { /* ignore if no session */ }
+
         await account.create(ID.unique(), email, password, name);
         return account.createEmailPasswordSession(email, password);
     },
@@ -77,6 +85,27 @@ export const auth = {
 // 🏠 PROPERTY OPERATIONS
 // ============================================================================
 
+function mapProperty(doc: any): Property {
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    // Parse '19.4208897,72.8193' into respective float coordinates
+    if (doc.PinLocation && typeof doc.PinLocation === 'string') {
+        const parts = doc.PinLocation.split(',');
+        if (parts.length >= 2) {
+            lat = parseFloat(parts[0].trim());
+            lng = parseFloat(parts[1].trim());
+        }
+    }
+
+    return {
+        ...doc,
+        // Override with parsed PinLocation if valid, else fall back to explicit lat/lng or undefined
+        latitude: lat !== undefined && !isNaN(lat) ? lat : doc.latitude,
+        longitude: lng !== undefined && !isNaN(lng) ? lng : doc.longitude,
+    } as Property;
+}
+
 export const properties = {
     async getAll(limit: number = 25, offset: number = 0) {
         const response = await databases.listDocuments(DB, COLL.plots, [
@@ -85,26 +114,27 @@ export const properties = {
             Query.offset(offset),
         ]);
         return {
-            documents: response.documents as unknown as Property[],
+            documents: response.documents.map(mapProperty),
             total: response.total,
         };
     },
 
     async getById(id: string) {
         const doc = await databases.getDocument(DB, COLL.plots, id);
-        return doc as unknown as Property;
+        return mapProperty(doc);
     },
 
     async search(query: string, filters?: {
         type?: string;
         minPrice?: number;
         maxPrice?: number;
+        vastu?: string;
+        minArea?: number;
+        maxArea?: number;
     }) {
-        const queries = [Query.orderDesc('$createdAt'), Query.limit(25)];
+        // Increase limit since we are filtering locally to bypass Appwrite missing index errors
+        const queries = [Query.orderDesc('$createdAt'), Query.limit(100)];
 
-        if (query) {
-            queries.push(Query.search('title', query));
-        }
         if (filters?.type) {
             queries.push(Query.equal('type', filters.type));
         }
@@ -116,14 +146,64 @@ export const properties = {
         }
 
         const response = await databases.listDocuments(DB, COLL.plots, queries);
+        let docs = response.documents.map(mapProperty);
+
+        // Perform robust client-side multi-attribute search to bypass DB index requirements
+        let filteredDocs = docs;
+        if (query) {
+            const lowerQuery = query.toLowerCase().trim();
+            const keywords = lowerQuery.split(/\s+/);
+
+            filteredDocs = filteredDocs.filter(doc => {
+                const searchableText = `
+                    ${doc.title || ''} 
+                    ${doc.location || ''} 
+                    ${doc.city || ''} 
+                `.toLowerCase();
+                return keywords.every(kw => searchableText.includes(kw));
+            });
+        }
+
+        // Apply advanced numerical bounds and strict matching
+        if (filters) {
+            filteredDocs = filteredDocs.filter(doc => {
+                let matchesVastu = !filters.vastu || doc.vastu === filters.vastu;
+                let matchesArea = true;
+                if (filters.minArea) matchesArea = matchesArea && doc.area >= filters.minArea;
+                if (filters.maxArea) matchesArea = matchesArea && doc.area <= filters.maxArea;
+                return matchesVastu && matchesArea;
+            });
+        }
+
         return {
-            documents: response.documents as unknown as Property[],
+            documents: filteredDocs,
+            total: filteredDocs.length,
+        };
+    },
+
+    async getByUser(userId: string) {
+        const response = await databases.listDocuments(DB, COLL.plots, [
+            Query.equal('userId', userId),
+            Query.orderDesc('$createdAt')
+        ]);
+        return {
+            documents: response.documents.map(mapProperty),
             total: response.total,
         };
     },
 
     async create(data: Partial<Property>) {
-        return databases.createDocument(DB, COLL.plots, ID.unique(), data);
+        return databases.createDocument(
+            DB,
+            COLL.plots,
+            ID.unique(),
+            data,
+            [
+                Permission.read(Role.any()),                  // Anyone can view
+                Permission.update(Role.user(data.userId!)),   // Only owner can edit
+                Permission.delete(Role.user(data.userId!)),   // Only owner can delete
+            ]
+        );
     },
 
     async update(id: string, data: Partial<Property>) {
@@ -174,15 +254,66 @@ export const properties = {
 
 export const images = {
     async upload(uri: string, name: string, type: string) {
-        // react-native-appwrite accepts objects with uri/name/type/size
-        const file = {
-            uri,
-            name: name || `image_${Date.now()}.jpg`,
-            type: type || 'image/jpeg',
-            size: 0,
-        };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return storage.createFile(BUCKET.images, ID.unique(), file as any);
+        try {
+            if (Platform.OS === 'web') {
+                // The pure JS web SDK strictly requires a Blob/File object to construct form-data securely
+                const response = await fetch(uri);
+                const blob = await response.blob();
+                const fileObj = new File([blob], name || `image_${Date.now()}.jpg`, {
+                    type: type || 'image/jpeg'
+                });
+                return await storage.createFile(BUCKET.images, ID.unique(), fileObj);
+            } else {
+                // Native Mobile: Bypass the incompatible Appwrite JS SDK File validation constraint
+                // We use pure React Native `fetch` with FormData directly to the Appwrite REST API
+                const url = `${ENV.appwrite.endpoint}/storage/buckets/${BUCKET.images}/files`;
+                const fileId = ID.unique();
+                const nativeUri = Platform.OS === 'android' ? uri : uri.replace('file://', '');
+
+                const formData = new FormData();
+                formData.append('fileId', fileId);
+                // @ts-ignore - React Native FormData accepts an object with uri, name, type
+                formData.append('file', {
+                    uri: nativeUri,
+                    name: name || `image_${Date.now()}.jpg`,
+                    type: type || 'image/jpeg',
+                });
+                // Adding global read permissions for public access
+                formData.append('permissions[]', 'read("any")');
+
+                // Get current session for authenticated upload
+                let authHeaders = {};
+                try {
+                    const sessionParams = await account.getSession('current');
+                    if (sessionParams && sessionParams.providerAccessToken) {
+                        authHeaders = { 'X-Appwrite-JWT': sessionParams.providerAccessToken };
+                    }
+                } catch (e) {
+                    // Ignore, we will rely on cookie fallback or standard anon if allowed
+                }
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Appwrite-Project': ENV.appwrite.projectId,
+                        ...authHeaders,
+                        // Not setting 'Content-Type' manually allows React Native to calculate multipart boundary
+                    },
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'File upload failed');
+                }
+
+                return data;
+            }
+        } catch (error) {
+            console.error('Appwrite Upload Error:', error);
+            throw error;
+        }
     },
 };
 

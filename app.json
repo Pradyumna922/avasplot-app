@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.avasplot.app"
+      "bundleIdentifier": "com.avasplot.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDbSAs89iY3bT5fUCO-RgW-BvFCHvEIv_M"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +23,12 @@
       },
       "package": "com.avasplot.app",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDbSAs89iY3bT5fUCO-RgW-BvFCHvEIv_M"
+        }
+      }
     },
     "web": {
       "output": "static",

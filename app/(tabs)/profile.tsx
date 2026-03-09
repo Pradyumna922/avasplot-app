@@ -17,9 +17,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
-import { profiles, subscriptions } from '../../src/services/appwrite';
+import { formatPrice, profiles, properties, subscriptions } from '../../src/services/appwrite';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
-import { ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from '../../src/types';
+import { Property, ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from '../../src/types';
 
 export default function ProfileScreen() {
     const { user, isLoggedIn, prefs, logout } = useAuth();
@@ -27,17 +27,24 @@ export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
     const [subscription, setSubscription] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
+    const [myProperties, setMyProperties] = useState<Property[]>([]);
+    const [loadingProps, setLoadingProps] = useState(false);
 
     const loadProfile = useCallback(async () => {
         if (!user?.$id) return;
         try {
-            const [sub, prof] = await Promise.all([
+            setLoadingProps(true);
+            const [sub, prof, myPropsRes] = await Promise.all([
                 subscriptions.get(user.$id),
                 profiles.get(user.$id),
+                properties.getByUser(user.$id)
             ]);
             setSubscription(sub);
             setProfile(prof);
-        } catch { /* ignore */ }
+            setMyProperties(myPropsRes.documents);
+        } catch { /* ignore */ } finally {
+            setLoadingProps(false);
+        }
     }, [user?.$id]);
 
     useEffect(() => {
@@ -74,6 +81,25 @@ export default function ProfileScreen() {
                 onPress: async () => {
                     await logout();
                     router.replace('/(auth)/login');
+                },
+            },
+        ]);
+    };
+
+    const handleDeleteProperty = (id: string, title: string) => {
+        Alert.alert('Delete Property', `Are you sure you want to delete "${title}"?`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await properties.delete(id);
+                        setMyProperties((prev) => prev.filter(p => p.$id !== id));
+                        Alert.alert('Deleted', 'Your property was removed.', [{ text: 'OK' }]);
+                    } catch {
+                        Alert.alert('Error', 'Failed to delete property.');
+                    }
                 },
             },
         ]);
@@ -162,6 +188,52 @@ export default function ProfileScreen() {
                         </View>
                     </View>
                 ))}
+
+                {/* My Listings Section */}
+                <View style={styles.menuSection}>
+                    <Text style={styles.sectionTitle}>My Listings</Text>
+                    {loadingProps ? (
+                        <View style={{ padding: Spacing.xl, alignItems: 'center' }}>
+                            <Text style={{ color: Colors.textMuted }}>Loading listings...</Text>
+                        </View>
+                    ) : myProperties.length === 0 ? (
+                        <View style={styles.emptyCard}>
+                            <Ionicons name="home-outline" size={32} color={Colors.textMuted} />
+                            <Text style={styles.emptyText}>You haven't listed any properties yet.</Text>
+                        </View>
+                    ) : (
+                        <View style={{ gap: Spacing.md }}>
+                            {myProperties.map(prop => (
+                                <View key={prop.$id} style={styles.listingCard}>
+                                    <View style={styles.listingCardRow}>
+                                        <View style={styles.listingCardImagePlaceholder}>
+                                            <Ionicons name="image-outline" size={24} color={Colors.primary} />
+                                        </View>
+                                        <View style={styles.listingCardDetails}>
+                                            <Text style={styles.listingCardTitle} numberOfLines={1}>{prop.title}</Text>
+                                            <Text style={styles.listingCardSubtitle} numberOfLines={1}>{prop.location}</Text>
+                                            <Text style={styles.listingCardPrice}>{formatPrice(prop.price)}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.listingCardActions}>
+                                        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push(`/property/${prop.$id}`)}>
+                                            <Ionicons name="eye-outline" size={16} color={Colors.primary} />
+                                            <Text style={styles.actionBtnText}>View</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push(`/edit/${prop.$id}`)}>
+                                            <Ionicons name="pencil-outline" size={16} color={Colors.text} />
+                                            <Text style={[styles.actionBtnText, { color: Colors.text }]}>Edit</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.actionBtnError} onPress={() => handleDeleteProperty(prop.$id, prop.title)}>
+                                            <Ionicons name="trash-outline" size={16} color={Colors.error} />
+                                            <Text style={styles.actionBtnTextError}>Delete</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+                </View>
 
                 {/* Logout */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.7}>
@@ -265,4 +337,60 @@ const styles = StyleSheet.create({
     logoutText: { ...Typography.bodyBold, color: Colors.error },
 
     version: { ...Typography.tiny, color: Colors.textMuted, textAlign: 'center', marginBottom: Spacing.xl },
+
+    emptyCard: {
+        padding: Spacing.xxl,
+        alignItems: 'center',
+        backgroundColor: Colors.surface,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.glassBorder,
+        gap: Spacing.md,
+    },
+    emptyText: { ...Typography.body, color: Colors.textSecondary },
+
+    listingCard: {
+        backgroundColor: Colors.surface,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.glassBorder,
+        overflow: 'hidden',
+    },
+    listingCardRow: {
+        flexDirection: 'row',
+        padding: Spacing.md,
+        gap: Spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.glassBorder,
+    },
+    listingCardImagePlaceholder: {
+        width: 80, height: 80, borderRadius: BorderRadius.md,
+        backgroundColor: Colors.glass,
+        justifyContent: 'center', alignItems: 'center',
+    },
+    listingCardDetails: { flex: 1, justifyContent: 'center' },
+    listingCardTitle: { ...Typography.bodyBold, color: Colors.text, marginBottom: 2 },
+    listingCardSubtitle: { ...Typography.caption, color: Colors.textSecondary, marginBottom: Spacing.sm },
+    listingCardPrice: { ...Typography.captionBold, color: Colors.primary },
+
+    listingCardActions: {
+        flexDirection: 'row',
+    },
+    actionBtn: {
+        flex: 1,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        paddingVertical: Spacing.md,
+        gap: Spacing.xs,
+        borderRightWidth: 1,
+        borderRightColor: Colors.glassBorder,
+    },
+    actionBtnError: {
+        flex: 1,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        paddingVertical: Spacing.md,
+        gap: Spacing.xs,
+        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+    },
+    actionBtnText: { ...Typography.captionBold, color: Colors.primary },
+    actionBtnTextError: { ...Typography.captionBold, color: Colors.error },
 });

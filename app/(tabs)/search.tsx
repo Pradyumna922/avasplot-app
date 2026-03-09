@@ -17,6 +17,8 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    Modal,
+    Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatArea, formatPrice, properties } from '../../src/services/appwrite';
@@ -25,16 +27,16 @@ import { Property, PROPERTY_TYPES } from '../../src/types';
 
 // Icons mapped to property types for visual variety
 const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
-    'Residential Plot': { icon: 'home-outline', color: '#10B981' },
-    'Commercial Plot': { icon: 'business-outline', color: '#3B82F6' },
-    'Agricultural Land': { icon: 'leaf-outline', color: '#22C55E' },
-    'Industrial Plot': { icon: 'construct-outline', color: '#F97316' },
-    'Farm House': { icon: 'flower-outline', color: '#8B5CF6' },
-    'Flat / Apartment': { icon: 'grid-outline', color: '#06B6D4' },
-    'Villa': { icon: 'diamond-outline', color: '#EC4899' },
-    'Office Space': { icon: 'briefcase-outline', color: '#6366F1' },
-    'Shop / Showroom': { icon: 'storefront-outline', color: '#14B8A6' },
-    'Warehouse': { icon: 'cube-outline', color: '#64748B' },
+    'residential': { icon: 'home-outline', color: '#10B981' },
+    'commercial': { icon: 'business-outline', color: '#3B82F6' },
+    'agricultural': { icon: 'leaf-outline', color: '#22C55E' },
+    'industrial': { icon: 'construct-outline', color: '#F97316' },
+    'farm house': { icon: 'flower-outline', color: '#8B5CF6' },
+    'flat / apartment': { icon: 'grid-outline', color: '#06B6D4' },
+    'villa': { icon: 'diamond-outline', color: '#EC4899' },
+    'office space': { icon: 'briefcase-outline', color: '#6366F1' },
+    'shop / showroom': { icon: 'storefront-outline', color: '#14B8A6' },
+    'warehouse': { icon: 'cube-outline', color: '#64748B' },
 };
 
 export default function SearchScreen() {
@@ -43,28 +45,76 @@ export default function SearchScreen() {
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);
     const [selectedType, setSelectedType] = useState<string>('');
+    const [isFilterVisible, setIsFilterVisible] = useState(false);
+    const [minPrice, setMinPrice] = useState('');
+    const [maxPrice, setMaxPrice] = useState('');
+    const [minArea, setMinArea] = useState('');
+    const [maxArea, setMaxArea] = useState('');
+    const [selectedVastu, setSelectedVastu] = useState<string | null>(null);
+
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
-    const handleSearch = useCallback(async () => {
-        if (!query.trim() && !selectedType) return;
+    const executeSearch = useCallback(async (params: {
+        query: string;
+        type?: string;
+        minPrice?: string;
+        maxPrice?: string;
+        minArea?: string;
+        maxArea?: string;
+        vastu?: string | null;
+    }) => {
+        if (!params.query.trim() && !params.type && !params.minPrice && !params.maxPrice && !params.vastu && !params.minArea && !params.maxArea) {
+            setResults([]);
+            setSearched(false);
+            return;
+        }
+
         setLoading(true);
         setSearched(true);
         try {
-            const result = await properties.search(query.trim(), {
-                type: selectedType || undefined,
+            const result = await properties.search(params.query.trim(), {
+                type: params.type || undefined,
+                minPrice: params.minPrice ? parseInt(params.minPrice.replace(/\D/g, ''), 10) : undefined,
+                maxPrice: params.maxPrice ? parseInt(params.maxPrice.replace(/\D/g, ''), 10) : undefined,
+                minArea: params.minArea ? parseInt(params.minArea.replace(/\D/g, ''), 10) : undefined,
+                maxArea: params.maxArea ? parseInt(params.maxArea.replace(/\D/g, ''), 10) : undefined,
+                vastu: params.vastu || undefined,
             });
             setResults(result.documents);
         } catch (err) {
             console.error('Search failed:', err);
         } finally {
             setLoading(false);
+            setIsFilterVisible(false);
         }
-    }, [query, selectedType]);
+    }, []);
+
+    const handleSearch = () => {
+        executeSearch({
+            query,
+            type: selectedType,
+            minPrice,
+            maxPrice,
+            minArea,
+            maxArea,
+            vastu: selectedVastu
+        });
+    };
 
     const handleTypeSelect = (type: string) => {
         const newType = type === selectedType ? '' : type;
         setSelectedType(newType);
+
+        executeSearch({
+            query,
+            type: newType,
+            minPrice,
+            maxPrice,
+            minArea,
+            maxArea,
+            vastu: selectedVastu
+        });
     };
 
     // ---- Result Card ----
@@ -111,7 +161,7 @@ export default function SearchScreen() {
                     </View>
                     <View style={styles.resultFooter}>
                         <View style={[styles.typePill, { backgroundColor: typeInfo.color + '15' }]}>
-                            <Text style={[styles.typePillText, { color: typeInfo.color }]}>
+                            <Text style={[styles.typePillText, { color: typeInfo.color, textTransform: 'capitalize' }]}>
                                 {item.type?.replace(' / ', '/')}
                             </Text>
                         </View>
@@ -134,12 +184,12 @@ export default function SearchScreen() {
             </View>
 
             {/* ─── Search Input ─── */}
-            <View style={styles.searchSection}>
-                <View style={styles.searchBar}>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', marginHorizontal: Spacing.xl, marginVertical: Spacing.md }}>
+                <View style={[styles.searchBar, { flex: 1 }]}>
                     <Ionicons name="search-outline" size={18} color={Colors.textMuted} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Location, project, or keyword..."
+                        placeholder="Location, project..."
                         placeholderTextColor={Colors.textMuted}
                         value={query}
                         onChangeText={setQuery}
@@ -152,6 +202,12 @@ export default function SearchScreen() {
                         </TouchableOpacity>
                     ) : null}
                 </View>
+                <TouchableOpacity
+                    style={styles.filterToggleButton}
+                    onPress={() => setIsFilterVisible(true)}
+                >
+                    <Ionicons name="options-outline" size={22} color="#FFF" />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={handleSearch} activeOpacity={0.8}>
                     <LinearGradient
                         colors={[Colors.primary, Colors.primaryDark]}
@@ -190,7 +246,7 @@ export default function SearchScreen() {
                                 size={14}
                                 color={isActive ? '#FFF' : info.color}
                             />
-                            <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                            <Text style={[styles.chipText, isActive && styles.chipTextActive, { textTransform: 'capitalize' }]}>
                                 {type.replace(' / ', '/')}
                             </Text>
                         </TouchableOpacity>
@@ -231,50 +287,101 @@ export default function SearchScreen() {
             ) : (
                 /* ─── Empty / Discovery State ─── */
                 <View style={styles.discoveryContainer}>
-                    {/* Hero illustration */}
-                    <View style={styles.discoveryHero}>
-                        <LinearGradient
-                            colors={[Colors.primary, Colors.secondary]}
-                            style={styles.discoveryIcon}
-                        >
-                            <Ionicons name="search" size={32} color="#FFF" />
-                        </LinearGradient>
-                        <Text style={styles.discoveryTitle}>Discover Properties</Text>
-                        <Text style={styles.discoverySubtitle}>
-                            Search by location, project name, or browse by type
-                        </Text>
-                    </View>
+                    <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                        {/* Hero illustration */}
+                        <View style={styles.discoveryHero}>
+                            <LinearGradient
+                                colors={[Colors.primary, Colors.secondary]}
+                                style={styles.discoveryIcon}
+                            >
+                                <Ionicons name="search" size={32} color="#FFF" />
+                            </LinearGradient>
+                            <Text style={styles.discoveryTitle}>Discover Properties</Text>
+                            <Text style={styles.discoverySubtitle}>
+                                Search by location, project name, or browse by type
+                            </Text>
+                        </View>
 
-                    {/* Quick Category Grid */}
-                    <Text style={styles.sectionLabel}>Browse by Category</Text>
-                    <View style={styles.categoryGrid}>
-                        {PROPERTY_TYPES.slice(0, 6).map((type) => {
-                            const info = TYPE_ICONS[type] || { icon: 'ellipse-outline', color: Colors.primary };
-                            return (
-                                <TouchableOpacity
-                                    key={type}
-                                    style={styles.categoryCard}
-                                    activeOpacity={0.7}
-                                    onPress={() => {
-                                        setSelectedType(type);
-                                        setQuery('');
-                                        handleSearch();
-                                    }}
-                                >
-                                    <View style={[styles.categoryIconWrap, { backgroundColor: info.color + '12' }]}>
-                                        <Ionicons
-                                            name={info.icon as keyof typeof Ionicons.glyphMap}
-                                            size={22}
-                                            color={info.color}
-                                        />
-                                    </View>
-                                    <Text style={styles.categoryLabel} numberOfLines={2}>{type}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
+                        {/* Quick Category Grid */}
+                        <Text style={styles.sectionLabel}>Browse by Category</Text>
+                        <View style={styles.categoryGrid}>
+                            {PROPERTY_TYPES.slice(0, 6).map((type) => {
+                                const info = TYPE_ICONS[type] || { icon: 'ellipse-outline', color: Colors.primary };
+                                return (
+                                    <TouchableOpacity
+                                        key={type}
+                                        style={styles.categoryCard}
+                                        activeOpacity={0.7}
+                                        onPress={() => handleTypeSelect(type)}
+                                    >
+                                        <View style={[styles.categoryIconWrap, { backgroundColor: info.color + '12' }]}>
+                                            <Ionicons
+                                                name={info.icon as keyof typeof Ionicons.glyphMap}
+                                                size={22}
+                                                color={info.color}
+                                            />
+                                        </View>
+                                        <Text style={[styles.categoryLabel, { textTransform: 'capitalize' }]} numberOfLines={2}>{type}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </ScrollView>
                 </View>
             )}
+
+            {/* ADVANCED FILTER MODAL */}
+            <Modal visible={isFilterVisible} transparent animationType="slide" onRequestClose={() => setIsFilterVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.filterSectionTitle}>Advanced Filters</Text>
+                            <TouchableOpacity onPress={() => setIsFilterVisible(false)}>
+                                <Ionicons name="close-circle" size={28} color={Colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.filterSection}>
+                            <Text style={styles.filterSectionTitle}>Price Range</Text>
+                            <View style={styles.filterRow}>
+                                <TextInput style={styles.filterInput} placeholder="Min (₹)" value={minPrice} onChangeText={setMinPrice} keyboardType="numeric" />
+                                <TextInput style={styles.filterInput} placeholder="Max (₹)" value={maxPrice} onChangeText={setMaxPrice} keyboardType="numeric" />
+                            </View>
+                        </View>
+
+                        <View style={styles.filterSection}>
+                            <Text style={styles.filterSectionTitle}>Area Range (sq.ft)</Text>
+                            <View style={styles.filterRow}>
+                                <TextInput style={styles.filterInput} placeholder="Min Area" value={minArea} onChangeText={setMinArea} keyboardType="numeric" />
+                                <TextInput style={styles.filterInput} placeholder="Max Area" value={maxArea} onChangeText={setMaxArea} keyboardType="numeric" />
+                            </View>
+                        </View>
+
+                        <View style={styles.filterSection}>
+                            <Text style={styles.filterSectionTitle}>Vastu Preference</Text>
+                            <View style={styles.vastuRow}>
+                                {['East Facing', 'North Facing', 'West Facing'].map(dir => (
+                                    <TouchableOpacity key={dir} style={[styles.vastuPill, selectedVastu === dir && styles.vastuPillActive]} onPress={() => setSelectedVastu(selectedVastu === dir ? null : dir)}>
+                                        <Text style={[styles.vastuPillText, selectedVastu === dir && styles.vastuPillTextActive]}>{dir}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity style={styles.clearFilterBtn} onPress={() => {
+                                setMinPrice(''); setMaxPrice(''); setMinArea(''); setMaxArea(''); setSelectedVastu(null);
+                                executeSearch({ query, type: selectedType, minPrice: '', maxPrice: '', minArea: '', maxArea: '', vastu: null });
+                            }}>
+                                <Text style={styles.clearFilterText}>Clear All</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.applyFilterBtn} onPress={handleSearch}>
+                                <Text style={styles.applyFilterText}>Apply Filters</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -336,12 +443,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    filterToggleButton: {
+        width: 44,
+        height: 44,
+        borderRadius: BorderRadius.md,
+        backgroundColor: '#0F172A',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 
     // ─── Filter Chips ───
     chipRow: {
         paddingHorizontal: Spacing.xl,
         gap: 8,
-        paddingBottom: Spacing.md,
+        paddingBottom: Spacing.sm,
     },
     chip: {
         flexDirection: 'row',
@@ -509,7 +624,7 @@ const styles = StyleSheet.create({
 
     // ─── Discovery State ───
     discoveryContainer: {
-        flex: 1,
+        flexGrow: 1,
         paddingHorizontal: Spacing.xl,
     },
     discoveryHero: {
@@ -574,5 +689,115 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
         textAlign: 'center',
         paddingHorizontal: 4,
+    },
+
+    // ============================================================================
+    // 🔍 MODAL STYLES (Filter UI)
+    // ============================================================================
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: BorderRadius.xxl,
+        borderTopRightRadius: BorderRadius.xxl,
+        padding: Spacing.xl,
+        paddingBottom: Platform.OS === 'ios' ? 40 : Spacing.xl,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.xl,
+    },
+    filterSection: {
+        marginBottom: Spacing.xl,
+    },
+    filterSectionTitle: {
+        ...Typography.h3,
+        color: '#475569',
+        marginBottom: Spacing.md,
+    },
+    filterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: Spacing.md,
+    },
+    filterInput: {
+        flex: 1,
+        height: 48,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.md,
+        ...Typography.body,
+        color: '#0F172A',
+    },
+    vastuRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Spacing.sm,
+    },
+    vastuPill: {
+        paddingHorizontal: Spacing.lg,
+        paddingVertical: Spacing.sm,
+        backgroundColor: '#F1F5F9',
+        borderRadius: BorderRadius.full,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    vastuPillActive: {
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        borderColor: '#10B981',
+    },
+    vastuPillText: {
+        ...Typography.bodyBold,
+        color: '#64748B',
+    },
+    vastuPillTextActive: {
+        color: '#059669',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: Spacing.md,
+        marginTop: Spacing.md,
+    },
+    clearFilterBtn: {
+        flex: 1,
+        height: 52,
+        borderRadius: BorderRadius.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
+    },
+    clearFilterText: {
+        ...Typography.bodyBold,
+        color: '#475569',
+    },
+    applyFilterBtn: {
+        flex: 2,
+        height: 52,
+        borderRadius: BorderRadius.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: Colors.primary,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    applyFilterText: {
+        ...Typography.bodyBold,
+        color: '#FFF',
     },
 });

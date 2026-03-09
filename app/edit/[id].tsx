@@ -5,7 +5,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState, useRef } from 'react';
 import {
     ActivityIndicator,
@@ -47,13 +47,15 @@ import { PROPERTY_TYPES } from '../../src/types';
 
 const STEPS = ['Details', 'Location', 'Images', 'Verify'];
 
-export default function PostScreen() {
+export default function EditScreen() {
     const { user, isLoggedIn, prefs } = useAuth();
     const router = useRouter();
+    const { id } = useLocalSearchParams();
     const insets = useSafeAreaInsets();
 
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [isFetchingInitial, setIsFetchingInitial] = useState(true);
 
     // Step 1 State
     const [listingType, setListingType] = useState<'For Sale' | 'For Rent'>('For Sale');
@@ -84,6 +86,41 @@ export default function PostScreen() {
     // Step 4 State
     const [aadhaarImage, setAadhaarImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const [sevTwelveImage, setSevTwelveImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+
+    React.useEffect(() => {
+        const fetchExistingProperty = async () => {
+            if (!id) return;
+            try {
+                const prop = await properties.getById(id as string);
+                setTitle(prop.title || '');
+                setPrice(prop.price ? prop.price.toString() : '');
+                setArea(prop.area ? prop.area.toString() : '');
+                setType(prop.type || '');
+                setVastu(prop.vastu || '');
+                setCity(prop.city || '');
+                setLocation(prop.location || '');
+                setDescription(prop.description || '');
+
+                if (prop.PinLocation) {
+                    const [lat, lng] = prop.PinLocation.split(',');
+                    const parsedLat = parseFloat(lat);
+                    const parsedLng = parseFloat(lng);
+                    setPinLocation({ latitude: parsedLat, longitude: parsedLng });
+                    setMapRegion({
+                        latitude: parsedLat,
+                        longitude: parsedLng,
+                        latitudeDelta: 0.05,
+                        longitudeDelta: 0.05,
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to fetch property details:', error);
+            } finally {
+                setIsFetchingInitial(false);
+            }
+        };
+        fetchExistingProperty();
+    }, [id]);
 
     if (!isLoggedIn) {
         return (
@@ -139,10 +176,7 @@ export default function PostScreen() {
                 return;
             }
         } else if (currentStep === 3) {
-            if (selectedImages.length === 0) {
-                Alert.alert('Missing Images', 'Please upload at least one image of the property.');
-                return;
-            }
+            // Edit mode: they might not select new images, so we skip this hard requirement.
         }
         setCurrentStep((prev) => Math.min(prev + 1, 4));
     };
@@ -216,43 +250,29 @@ export default function PostScreen() {
                 sevTwelveUrl = uploaded.$id;
             }
 
-            // Create property
-            await properties.create({
+            const updatePayload: any = {
                 title: title.trim(),
                 price: parseFloat(price),
                 area: parseFloat(area.trim()) || 0,
                 location: location.trim(),
                 city: city.trim(),
-                type: type, // e.g. "residential"
-                propertyType: type, // Strict Enum parity
-                status: 'available', // Strict Enum: "available", "sold", "pending"
-                // Ideally listingType (For Sale/Rent) gets a proper column later. For now, prepended to title.
+                type: type,
+                propertyType: type,
                 description: description.trim(),
                 vastu: vastu.trim(),
-                images: uploadedIds,
-                AadharCard: aadhaarUrl ? [aadhaarUrl] : [],
-                Extract: sevTwelveUrl ? [sevTwelveUrl] : [],
-                sellerName: user?.name || '',
-                owner_name: user?.name || '',
-                userId: user?.$id || '',
-                owner_id: user?.$id ? [user.$id] : [],
-                email: user?.email || '',
-                mobile: prefs.phone || '',
-                verified: false,
-                views: 0,
-                favorites: 0,
-                landmark: '',
-                state: '',
-                pincode: '',
-                amenities: [],
-                PinLocation: pinLocation ? `${pinLocation.latitude},${pinLocation.longitude}` : '',
-            });
+            };
 
-            Alert.alert('Success! 🎉', 'Your property has been listed.', [
+            if (uploadedIds.length > 0) updatePayload.images = uploadedIds;
+            if (aadhaarUrl) updatePayload.AadharCard = [aadhaarUrl];
+            if (sevTwelveUrl) updatePayload.Extract = [sevTwelveUrl];
+            if (pinLocation) updatePayload.PinLocation = `${pinLocation.latitude},${pinLocation.longitude}`;
+
+            // Update property instead of create
+            await properties.update(id as string, updatePayload);
+
+            Alert.alert('Success! 🎉', 'Your property listing has been updated.', [
                 { text: 'View Listings', onPress: () => router.push('/(tabs)') },
             ]);
-
-            // Reset form
             setCurrentStep(1);
             setTitle('');
             setPrice('');
@@ -595,55 +615,66 @@ export default function PostScreen() {
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Post Property</Text>
+                    <Text style={styles.headerTitle}>Edit Property</Text>
                     {renderStepIndicator()}
                 </View>
 
-                {currentStep === 1 && renderStep1()}
-                {currentStep === 2 && renderStep2()}
-                {currentStep === 3 && renderStep3()}
-                {currentStep === 4 && renderStep4()}
+                {isFetchingInitial ? (
+                    <View style={{ padding: Spacing.xl, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={{ marginTop: Spacing.md, color: Colors.textMuted }}>Loading your property...</Text>
+                    </View>
+                ) : (
+                    <>
+                        {currentStep === 1 && renderStep1()}
+                        {currentStep === 2 && renderStep2()}
+                        {currentStep === 3 && renderStep3()}
+                        {currentStep === 4 && renderStep4()}
+                    </>
+                )}
 
                 {/* Navigation Buttons */}
-                <View style={styles.navigationButtons}>
-                    {currentStep > 1 && (
-                        <TouchableOpacity style={styles.backButton} onPress={prevStep} disabled={loading}>
-                            <Text style={styles.backButtonText}>Back</Text>
-                        </TouchableOpacity>
-                    )}
+                {!isFetchingInitial && (
+                    <View style={styles.navigationButtons}>
+                        {currentStep > 1 && (
+                            <TouchableOpacity style={styles.backButton} onPress={prevStep} disabled={loading}>
+                                <Text style={styles.backButtonText}>Back</Text>
+                            </TouchableOpacity>
+                        )}
 
-                    {currentStep < 4 ? (
-                        <TouchableOpacity style={styles.nextButton} onPress={nextStep}>
-                            <LinearGradient
-                                colors={[Colors.primary, Colors.secondary]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.buttonGradient}
-                            >
-                                <Text style={styles.submitButtonText}>Next</Text>
-                                <Ionicons name="arrow-forward" size={20} color="#FFF" />
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity style={styles.nextButton} onPress={handleSubmit} disabled={loading}>
-                            <LinearGradient
-                                colors={[Colors.success, '#10b981']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.buttonGradient}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="#FFF" />
-                                ) : (
-                                    <>
-                                        <Text style={styles.submitButtonText}>Submit Listing</Text>
-                                        <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-                                    </>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    )}
-                </View>
+                        {currentStep < 4 ? (
+                            <TouchableOpacity style={styles.nextButton} onPress={nextStep}>
+                                <LinearGradient
+                                    colors={[Colors.primary, Colors.secondary]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.buttonGradient}
+                                >
+                                    <Text style={styles.submitButtonText}>Next</Text>
+                                    <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity style={styles.nextButton} onPress={handleSubmit} disabled={loading}>
+                                <LinearGradient
+                                    colors={[Colors.success, '#10b981']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.buttonGradient}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color="#FFF" />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.submitButtonText}>Update Listing</Text>
+                                            <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                                        </>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
             </ScrollView>
         </View>
     );
