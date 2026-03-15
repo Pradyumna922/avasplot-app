@@ -6,7 +6,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -30,8 +30,14 @@ export default function SignupScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const { signup } = useAuth();
+    const { signup, isLoggedIn } = useAuth();
     const router = useRouter();
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            router.replace('/onboarding');
+        }
+    }, [isLoggedIn, router]);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -60,11 +66,10 @@ export default function SignupScreen() {
         setLoading(true);
         try {
             await signup(email.trim(), password, name.trim());
-            router.replace('/onboarding');
+            // Navigation handled by useEffect watching isLoggedIn
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Signup failed. Please try again.';
             Alert.alert('Signup Failed', message);
-        } finally {
             setLoading(false);
         }
     };

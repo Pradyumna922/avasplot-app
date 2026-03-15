@@ -476,8 +476,9 @@ const howItWorksSteps = [
 ];
 
 export default function HomeScreen() {
+  // Main Tabs State
   const topTabs = ['Plots', 'Services', 'Franchise', 'Scouts', 'Premium'];
-  const [mainTab, setMainTab] = useState('Plots');
+  const [mainTab, setMainTab] = useState<'Plots' | 'Services' | 'Franchise' | 'Scouts' | 'Premium'>('Plots');
   const [selectedServiceCategory, setSelectedServiceCategory] = useState('All Services');
 
 
@@ -494,6 +495,14 @@ export default function HomeScreen() {
   const [minArea, setMinArea] = useState('');
   const [maxArea, setMaxArea] = useState('');
   const [selectedVastu, setSelectedVastu] = useState<string | null>(null);
+
+  // Scout Form States
+  const [isScoutFormVisible, setIsScoutFormVisible] = useState(false);
+  const [scoutLocation, setScoutLocation] = useState('');
+  const [scoutContact, setScoutContact] = useState('');
+  const [scoutPrice, setScoutPrice] = useState('');
+  const [scoutSize, setScoutSize] = useState('');
+  const [scoutNotes, setScoutNotes] = useState('');
 
   // Interaction States
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -594,11 +603,17 @@ export default function HomeScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>
-            {isLoggedIn ? `Hey, ${user?.name?.split(' ')[0] || 'there'} 👋` : 'Welcome to'}
-          </Text>
-          <Text style={styles.appName}>AvasPlot</Text>
+        <View style={[styles.headerLeft, { flexDirection: 'row', alignItems: 'center', gap: Spacing.md }]}>
+          <Image 
+            source={require('../../assets/images/new-logo-transparent.png')} 
+            style={{ width: 48, height: 48, resizeMode: 'contain' }} 
+          />
+          <View>
+            <Text style={styles.greeting}>
+              {isLoggedIn ? `Hey, ${user?.name?.split(' ')[0] || 'there'} 👋` : 'Welcome to'}
+            </Text>
+            <Text style={[styles.appName, { fontSize: 24 }]}>AvasPlot</Text>
+          </View>
         </View>
         <TouchableOpacity
           style={styles.avatarButton}
@@ -620,7 +635,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={tab}
               style={[styles.topTabBtn, mainTab === tab && styles.topTabBtnActive]}
-              onPress={() => setMainTab(tab)}
+              onPress={() => setMainTab(tab as typeof mainTab)}
             >
               <Text style={[styles.topTabTxt, mainTab === tab && styles.topTabTxtActive]}>{tab}</Text>
               {mainTab === tab && <View style={styles.topTabIndicator} />}
@@ -977,7 +992,296 @@ export default function HomeScreen() {
           </View>
 
         </ScrollView>
+      ) : mainTab === 'Scouts' ? (
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          {/* Scout Hero */}
+          <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.franchiseHero}>
+            <View style={[styles.franchiseBadge, { borderColor: '#3B82F6', backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+              <Text style={[styles.franchiseBadgeTxt, { color: '#3B82F6' }]}>SCOUT PROGRAM</Text>
+            </View>
+            <Text style={styles.franchiseTitle}>Earn by <Text style={{ color: '#10B981' }}>Finding Land</Text></Text>
+            <Text style={styles.franchiseSub}>Turn your local knowledge into income. Get paid for every land plot you discover.</Text>
+          </LinearGradient>
+
+          {/* Program Stats */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.lg, gap: Spacing.md, justifyContent: 'space-between' }}>
+            {[
+              { value: '2,500+', label: 'Active Scouts' },
+              { value: '15,000+', label: 'Leads Submitted' },
+              { value: '₹2.5 Cr+', label: 'Total Paid Out' },
+              { value: '₹25,000', label: 'Avg. Monthly Earning' }
+            ].map((stat, idx) => (
+              <View key={idx} style={{ width: '47%', backgroundColor: '#1E293B', padding: Spacing.lg, borderRadius: BorderRadius.lg, alignItems: 'center' }}>
+                <Text style={{ fontFamily: 'Outfit-Bold', fontSize: 20, color: '#10B981' }}>{stat.value}</Text>
+                <Text style={{ ...Typography.caption, color: '#9CA3AF', marginTop: 4 }}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Why Become a Scout */}
+          <View style={[styles.whyPartnerContainer, { paddingVertical: Spacing.xl }]}>
+            <Text style={styles.sectionHeading}>Why Become a Scout?</Text>
+            <View style={styles.whyGrid}>
+              {[
+                { icon: 'cash-outline', title: 'Earn ₹5,000 - ₹50,000', desc: 'Per successful land referral' },
+                { icon: 'time-outline', title: 'Flexible Work', desc: 'Work on your own schedule' },
+                { icon: 'trending-up-outline', title: 'Unlimited Earnings', desc: 'No cap on monthly income' },
+                { icon: 'ribbon-outline', title: 'Performance Bonuses', desc: 'Extra rewards for top scouts' }
+              ].map((feat, idx) => (
+                <View key={idx} style={[styles.whyCard, { width: '48%', alignItems: 'center', padding: Spacing.xl }]}>
+                  <View style={[styles.whyIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.1)', width: 48, height: 48, borderRadius: 24 }]}>
+                    <Ionicons name={feat.icon as any} size={24} color="#10B981" />
+                  </View>
+                  <Text style={[styles.whyTitle, { textAlign: 'center', marginTop: Spacing.sm }]}>{feat.title}</Text>
+                  <Text style={[styles.whyDesc, { textAlign: 'center' }]}>{feat.desc}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Commission Structure */}
+          <View style={styles.whyPartnerContainer}>
+            <Text style={styles.sectionHeading}>Commission Structure</Text>
+            <View style={styles.whyGrid}>
+              <View style={styles.whyCard}>
+                <View style={[styles.whyIconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                  <Text style={{ fontSize: 16 }}>₹</Text>
+                </View>
+                <Text style={styles.whyTitle}>Deals up to ₹50L</Text>
+                <Text style={[styles.franPriceTxt, { fontSize: 22, marginTop: Spacing.sm }]}>₹5,000</Text>
+              </View>
+              <View style={styles.whyCard}>
+                <View style={[styles.whyIconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                  <Text style={{ fontSize: 16 }}>₹</Text>
+                </View>
+                <Text style={styles.whyTitle}>₹50L - ₹1Cr</Text>
+                <Text style={[styles.franPriceTxt, { fontSize: 22, marginTop: Spacing.sm }]}>₹15,000</Text>
+              </View>
+              <View style={styles.whyCard}>
+                <View style={[styles.whyIconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                  <Text style={{ fontSize: 16 }}>₹</Text>
+                </View>
+                <Text style={styles.whyTitle}>₹1Cr - ₹5Cr</Text>
+                <Text style={[styles.franPriceTxt, { fontSize: 22, marginTop: Spacing.sm }]}>₹30,000</Text>
+              </View>
+              <View style={styles.whyCard}>
+                <View style={[styles.whyIconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                  <Text style={{ fontSize: 16 }}>₹</Text>
+                </View>
+                <Text style={styles.whyTitle}>Above ₹5Cr</Text>
+                <Text style={[styles.franPriceTxt, { fontSize: 22, marginTop: Spacing.sm }]}>₹50,000+</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* How It Works */}
+          <View style={styles.howWorksContainer}>
+            <Text style={styles.sectionHeading}>How It Works</Text>
+            <View style={styles.howWorksGrid}>
+              {[
+                { step: '1', title: 'Find Land', desc: 'Identify land plots for sale in your local area.' },
+                { step: '2', title: 'Submit Details', desc: 'Provide map location, owner contact, estimated price, size, and photos.' },
+                { step: '3', title: 'Verification', desc: 'The Avasplot team verifies the information and contacts the owner.' },
+                { step: '4', title: 'Get Paid', desc: 'Earn a commission once the deal is successfully closed.' }
+              ].map((step, idx) => (
+                <View key={idx} style={styles.howCard}>
+                  <View style={[styles.stepCircle, { backgroundColor: '#3B82F6' }]}>
+                    <Text style={styles.stepNumTxt}>{step.step}</Text>
+                  </View>
+                  <Text style={styles.howTitle}>{step.title}</Text>
+                  <Text style={styles.howDesc}>{step.desc}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Footer CTA */}
+          <View style={styles.franFooterContainer}>
+            <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.franCtaBlock}>
+              <Text style={styles.franCtaTitle}>Ready to Start Earning?</Text>
+              <Text style={styles.franCtaSub}>Join the Scout Program today and monetize your local knowledge.</Text>
+              <TouchableOpacity 
+                style={[styles.franEmailBtn, { backgroundColor: Colors.primary }]}
+                onPress={() => setIsScoutFormVisible(true)}
+              >
+                <Text style={styles.franEmailTxt}>Join Scouts Program</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </ScrollView>
+      ) : mainTab === 'Premium' ? (
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, backgroundColor: '#111827' }}>
+          {/* Premium Hero */}
+          <LinearGradient colors={['#78350F', '#451A03']} style={[styles.franchiseHero, { paddingBottom: Spacing.xxl }]}>
+            <Ionicons name="diamond" size={48} color="#F59E0B" style={{ marginBottom: Spacing.md }} />
+            <Text style={[styles.franchiseTitle, { color: '#FCD34D' }]}>Citizen Membership</Text>
+            <Text style={styles.franchiseSub}>Unlock the ultimate real estate investing advantage with AI-tools and professional services.</Text>
+            <View style={[styles.franPriceBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)', paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, borderRadius: BorderRadius.lg, marginTop: Spacing.lg }]}>
+              <Text style={[styles.franPriceTxt, { color: '#FCD34D', textAlign: 'center' }]}>₹4,999</Text>
+              <Text style={[styles.franSub, { color: '#FDE68A', marginTop: 0 }]}>per month</Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.franEmailBtn, { backgroundColor: Colors.primary, marginTop: Spacing.xl, paddingHorizontal: Spacing.xxl * 2 }]}
+              onPress={() => Alert.alert('Coming Soon', 'Premium features and citizen memberships are coming shortly!')}
+            >
+              <Text style={[styles.franEmailTxt, { color: '#FFF' }]}>Subscribe Now</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          <View style={{ paddingHorizontal: Spacing.xl, paddingVertical: Spacing.xxl }}>
+            <Text style={[styles.sectionHeading, { color: '#FFF', textAlign: 'left', marginBottom: Spacing.lg }]}>AI Power Tools</Text>
+            <View style={{ gap: Spacing.md }}>
+              {[
+                { icon: 'trending-up', title: 'Unlimited Price Predictions', desc: 'Instant market value assessment using advanced AI models.' },
+                { icon: 'compass-outline', title: 'Instant Vastu Analysis', desc: 'AI-driven Vastu scores and orientation insights for every plot.' },
+                { icon: 'analytics-outline', title: 'Growth Reports', desc: 'Detailed connectivity, infrastructure, and real estate trend reports.' }
+              ].map((tool, idx) => (
+                <View key={idx} style={[styles.insightBox, { backgroundColor: 'rgba(245, 158, 11, 0.05)', borderColor: 'rgba(245, 158, 11, 0.2)' }]}>
+                  <View style={[styles.insightAvatar, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
+                    <Ionicons name={tool.icon as any} size={16} color="#FCD34D" />
+                  </View>
+                  <View style={styles.insightContent}>
+                    <Text style={[styles.insightTitle, { color: '#FCD34D', fontSize: 12 }]}>{tool.title}</Text>
+                    <Text style={[styles.insightText, { color: '#D1D5DB' }]}>{tool.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            <Text style={[styles.sectionHeading, { color: '#FFF', textAlign: 'left', marginTop: Spacing.xxl, marginBottom: Spacing.lg }]}>Investment Insurance</Text>
+            <View style={styles.whyGrid}>
+              {[
+                { icon: 'document-text-outline', title: '1x Legal Consult', desc: 'Direct consultation with a verified real estate lawyer.' },
+                { icon: 'briefcase-outline', title: '1x Wealth Session', desc: 'Portfolio planning with an expert.' },
+                { icon: 'map-outline', title: '1x Basic Survey', desc: 'Verify land boundaries before you purchase.' },
+                { icon: 'shield-checkmark-outline', title: 'Fraud Protection', desc: 'Ensures totally secure investments.' }
+              ].map((feat, idx) => (
+                <View key={idx} style={[styles.whyCard, { backgroundColor: '#1F2937', borderColor: '#374151' }]}>
+                  <View style={[styles.whyIconWrap, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                    <Ionicons name={feat.icon as any} size={20} color="#F59E0B" />
+                  </View>
+                  <Text style={[styles.whyTitle, { color: '#F3F4F6' }]}>{feat.title}</Text>
+                  <Text style={[styles.whyDesc, { color: '#9CA3AF' }]}>{feat.desc}</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={[styles.sectionHeading, { color: '#FFF', textAlign: 'left', marginTop: Spacing.xxl, marginBottom: Spacing.lg }]}>Security & Protection</Text>
+            <View style={styles.whyGrid}>
+              {[
+                { icon: 'shield-checkmark-outline', title: 'Fraud Protection', desc: 'Included in membership to ensure secure deals.' },
+                { icon: 'people-outline', title: 'Trusted Community', desc: 'Trusted by over 2,000 investors in the region.' },
+                { icon: 'card-outline', title: 'Secure Payment', desc: 'Managed via UPI/Card.' },
+                { icon: 'calendar-outline', title: 'Flexibility', desc: 'Cancel membership at any time.' }
+              ].map((feat, idx) => (
+                <View key={idx} style={[styles.whyCard, { backgroundColor: '#1F2937', borderColor: '#374151', width: '48%' }]}>
+                  <View style={[styles.whyIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                    <Ionicons name={feat.icon as any} size={20} color="#10B981" />
+                  </View>
+                  <Text style={[styles.whyTitle, { color: '#F3F4F6' }]}>{feat.title}</Text>
+                  <Text style={[styles.whyDesc, { color: '#9CA3AF' }]}>{feat.desc}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
       ) : null}
+
+      {/* SCOUT LEAD FORM MODAL */}
+      <Modal visible={isScoutFormVisible} transparent animationType="slide" onRequestClose={() => setIsScoutFormVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.filterSectionTitle}>Submit a Land Lead</Text>
+              <TouchableOpacity onPress={() => setIsScoutFormVisible(false)}>
+                <Ionicons name="close-circle" size={28} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Spacing.xl }}>
+              <View style={styles.filterSection}>
+                <Text style={styles.proSubtitle}>Land Location *</Text>
+                <TextInput 
+                  style={styles.filterInput} 
+                  placeholder="e.g., Survey No. 123, Village Name, City" 
+                  value={scoutLocation} 
+                  onChangeText={setScoutLocation} 
+                />
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.proSubtitle}>Owner Contact (if available)</Text>
+                <TextInput 
+                  style={styles.filterInput} 
+                  placeholder="Phone number or name" 
+                  value={scoutContact} 
+                  onChangeText={setScoutContact} 
+                />
+              </View>
+
+              <View style={styles.filterRow}>
+                <View style={[styles.filterSection, { flex: 1 }]}>
+                  <Text style={styles.proSubtitle}>Estimated Price</Text>
+                  <TextInput 
+                    style={styles.filterInput} 
+                    placeholder="Approx Value" 
+                    value={scoutPrice} 
+                    onChangeText={setScoutPrice} 
+                  />
+                </View>
+                <View style={[styles.filterSection, { flex: 1 }]}>
+                  <Text style={styles.proSubtitle}>Plot Size</Text>
+                  <TextInput 
+                    style={styles.filterInput} 
+                    placeholder="Approx Area" 
+                    value={scoutSize} 
+                    onChangeText={setScoutSize} 
+                  />
+                </View>
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.proSubtitle}>Additional Notes</Text>
+                <TextInput 
+                  style={[styles.filterInput, { height: 100, textAlignVertical: 'top' }]} 
+                  placeholder="Any additional information..." 
+                  multiline
+                  value={scoutNotes} 
+                  onChangeText={setScoutNotes} 
+                />
+              </View>
+
+              <View style={styles.filterSection}>
+                <TouchableOpacity style={[styles.proCard, { alignItems: 'center', borderStyle: 'dashed' }]}>
+                  <Ionicons name="camera-outline" size={24} color={Colors.textMuted} style={{ marginBottom: Spacing.sm }} />
+                  <Text style={styles.proSubtitle}>Upload Photos (Optional)</Text>
+                  <Text style={styles.proReviewTxt}>Photos increase verification speed</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.franEmailBtn, { backgroundColor: Colors.primary, marginTop: Spacing.xl }]}
+                onPress={() => {
+                  if(!scoutLocation) {
+                    Alert.alert('Required Field', 'Please provide a land location.');
+                    return;
+                  }
+                  Alert.alert('Scout Lead Submitted!', 'Thank you! The Avasplot team will verify this lead shortly.');
+                  setIsScoutFormVisible(false);
+                  setScoutLocation('');
+                  setScoutContact('');
+                  setScoutPrice('');
+                  setScoutSize('');
+                  setScoutNotes('');
+                }}
+              >
+                <Text style={[styles.franEmailTxt, { color: '#FFF', textAlign: 'center' }]}>Submit Lead</Text>
+              </TouchableOpacity>
+              <Text style={[styles.proReviewTxt, { textAlign: 'center', marginTop: Spacing.md, fontSize: 10 }]}>By submitting, you agree to our scout program terms.</Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* ADVANCED FILTER MODAL */}
       <Modal visible={isFilterVisible} transparent animationType="slide" onRequestClose={() => setIsFilterVisible(false)}>

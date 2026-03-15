@@ -6,7 +6,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -31,8 +31,14 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    const { login, isLoggedIn } = useAuth();
     const router = useRouter();
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            router.replace('/(tabs)');
+        }
+    }, [isLoggedIn, router]);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,11 +74,10 @@ export default function LoginScreen() {
         setLoading(true);
         try {
             await login(email.trim(), password);
-            router.replace('/(tabs)');
+            // Navigation is now handled by the useEffect watching isLoggedIn
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
             Alert.alert('Login Failed', message);
-        } finally {
             setLoading(false);
         }
     };

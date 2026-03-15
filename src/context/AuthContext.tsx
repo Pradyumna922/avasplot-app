@@ -18,7 +18,7 @@ interface AuthContextType extends AuthState {
     login: (email: string, password: string) => Promise<void>;
     signup: (email: string, password: string, name: string) => Promise<void>;
     logout: () => Promise<void>;
-    refreshUser: () => Promise<void>;
+    refreshUser: () => Promise<boolean>;
     updatePrefs: (prefs: Partial<UserPrefs>) => Promise<void>;
 }
 
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoggedIn: false,
     });
 
-    const refreshUser = useCallback(async () => {
+    const refreshUser = useCallback(async (): Promise<boolean> => {
         try {
             const user = await auth.getUser();
             if (user) {
@@ -42,11 +42,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     loading: false,
                     isLoggedIn: true,
                 });
+                return true;
             } else {
                 setState({ user: null, prefs: {}, loading: false, isLoggedIn: false });
+                return false;
             }
-        } catch {
+        } catch (error) {
+            console.error('refreshUser error:', error);
             setState({ user: null, prefs: {}, loading: false, isLoggedIn: false });
+            return false;
         }
     }, []);
 
@@ -56,12 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, password: string) => {
         await auth.login(email, password);
-        await refreshUser();
+        const success = await refreshUser();
+        if (!success) {
+            throw new Error('Failed to load user profile after login. Please try again.');
+        }
     };
 
     const signup = async (email: string, password: string, name: string) => {
         await auth.signup(email, password, name);
-        await refreshUser();
+        const success = await refreshUser();
+        if (!success) {
+            throw new Error('Failed to load user profile after signup. Please try again.');
+        }
     };
 
     const logout = async () => {
