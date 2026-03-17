@@ -31,7 +31,7 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const { login, isLoggedIn } = useAuth();
+    const { login, loginWithGoogle, isLoggedIn } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
@@ -78,6 +78,18 @@ export default function LoginScreen() {
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
             Alert.alert('Login Failed', message);
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        setLoading(true);
+        try {
+            await loginWithGoogle();
+            // Navigation is handled by the useEffect watching isLoggedIn
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Google sign-in failed. Please try again.';
+            Alert.alert('Google Sign-In Failed', message);
             setLoading(false);
         }
     };
@@ -199,7 +211,12 @@ export default function LoginScreen() {
                             </View>
 
                             {/* Social Login */}
-                            <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+                            <TouchableOpacity
+                                style={styles.socialButton}
+                                activeOpacity={0.7}
+                                onPress={handleGoogleLogin}
+                                disabled={loading}
+                            >
                                 <Ionicons name="logo-google" size={20} color={Colors.text} />
                                 <Text style={styles.socialButtonText}>Continue with Google</Text>
                             </TouchableOpacity>

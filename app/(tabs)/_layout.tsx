@@ -57,9 +57,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
+          title: 'Premium',
           tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name={focused ? 'search' : 'search-outline'} color={color} focused={focused} />
+            <TabBarIcon name={focused ? 'diamond' : 'diamond-outline'} color={color} focused={focused} />
           ),
         }}
       />

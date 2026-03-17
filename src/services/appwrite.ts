@@ -2,7 +2,9 @@
 // 🔌 APPWRITE SERVICE LAYER FOR REACT NATIVE
 // ============================================================================
 
-import { Account, Client, Databases, ID, Query, Storage, Permission, Role } from 'appwrite';
+import { Account, Client, Databases, ID, OAuthProvider, Query, Storage, Permission, Role } from 'appwrite';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { ENV } from '../config/env';
 import { Lead, Property, UserPrefs, UserRole } from '../types';
@@ -31,6 +33,43 @@ export const auth = {
             await account.deleteSession('current');
         } catch { /* ignore if no session */ }
         return account.createEmailPasswordSession(email, password);
+    },
+
+    async loginWithGoogle() {
+        // Build the deep-link URL the OAuth flow will redirect back to
+        const deepLink = Linking.createURL('/');
+        const successUrl = deepLink;
+        const failureUrl = deepLink;
+
+        // Manually construct the OAuth2 token URL.
+        // We can't use account.createOAuth2Token() because on web it tries
+        // to set window.location.href instead of returning the URL string.
+        const oauthUrl = `${ENV.appwrite.endpoint}/account/tokens/oauth2/google`
+            + `?project=${encodeURIComponent(ENV.appwrite.projectId)}`
+            + `&success=${encodeURIComponent(successUrl)}`
+            + `&failure=${encodeURIComponent(failureUrl)}`;
+
+        // Open the OAuth URL in an in-app auth browser session
+        const result = await WebBrowser.openAuthSessionAsync(
+            oauthUrl,
+            deepLink
+        );
+
+        if (result.type !== 'success' || !result.url) {
+            throw new Error('Google sign-in was cancelled or failed');
+        }
+
+        // Appwrite appends userId and secret as query params to the success URL
+        const url = new URL(result.url);
+        const userId = url.searchParams.get('userId');
+        const secret = url.searchParams.get('secret');
+
+        if (!userId || !secret) {
+            throw new Error('Failed to get credentials from Google sign-in');
+        }
+
+        // Create a session using the OAuth token
+        return account.createSession(userId, secret);
     },
 
     async signup(email: string, password: string, name: string) {

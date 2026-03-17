@@ -152,6 +152,7 @@ export interface UserPrefs {
     role?: UserRole;
     onboarded?: boolean;
     pincodes?: string;
+    avatarUrl?: string;
     [key: string]: unknown;
 }
 

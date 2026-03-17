@@ -4,31 +4,39 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
+    Image,
     Linking,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
-import { formatPrice, profiles, properties, subscriptions } from '../../src/services/appwrite';
+import { formatPrice, images as imageService, profiles, properties, subscriptions } from '../../src/services/appwrite';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
 import { Property, ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from '../../src/types';
 
 export default function ProfileScreen() {
-    const { user, isLoggedIn, prefs, logout } = useAuth();
+    const { user, isLoggedIn, prefs, logout, updatePrefs } = useAuth();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [subscription, setSubscription] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const [myProperties, setMyProperties] = useState<Property[]>([]);
     const [loadingProps, setLoadingProps] = useState(false);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [address, setAddress] = useState('');
+    const [license, setLicense] = useState('');
+    const [savingDetails, setSavingDetails] = useState(false);
 
     const loadProfile = useCallback(async () => {
         if (!user?.$id) return;
@@ -41,6 +49,8 @@ export default function ProfileScreen() {
             ]);
             setSubscription(sub);
             setProfile(prof);
+            if (prof?.address) setAddress(prof.address);
+            if (prof?.rera) setLicense(prof.rera);
             setMyProperties(myPropsRes.documents);
         } catch { /* ignore */ } finally {
             setLoadingProps(false);
@@ -105,17 +115,70 @@ export default function ProfileScreen() {
         ]);
     };
 
+    const handleSaveDetails = async () => {
+        if (!user?.$id) return;
+        setSavingDetails(true);
+        try {
+            await profiles.createOrUpdate(user.$id, { address, rera: license });
+            Alert.alert('Success', 'Information saved successfully!');
+        } catch (err) {
+            Alert.alert('Error', 'Failed to save information.');
+        } finally {
+            setSavingDetails(false);
+        }
+    };
+
     const roleColor = prefs.role ? ROLE_COLORS[prefs.role] : Colors.primary;
     const initials = user?.name
         ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
         : '?';
+    const avatarUrl = prefs.avatarUrl;
+
+    const handleChangePhoto = async () => {
+        try {
+            const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permResult.granted) {
+                Alert.alert('Permission Required', 'Please allow access to your photo library.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.7,
+            });
+
+            if (result.canceled || !result.assets?.[0]) return;
+
+            setUploadingPhoto(true);
+            const asset = result.assets[0];
+            const fileName = asset.fileName || `avatar_${Date.now()}.jpg`;
+            const fileType = asset.mimeType || 'image/jpeg';
+
+            // Upload to Appwrite storage
+            const uploaded = await imageService.upload(asset.uri, fileName, fileType);
+
+            // Build the preview URL from Appwrite
+            const photoUrl = properties.getImageUrl(uploaded.$id).toString();
+
+            // Save to user prefs
+            await updatePrefs({ avatarUrl: photoUrl });
+            Alert.alert('Success', 'Profile photo updated!');
+        } catch (err) {
+            console.error('Photo upload error:', err);
+            Alert.alert('Error', 'Failed to update profile photo. Please try again.');
+        } finally {
+            setUploadingPhoto(false);
+        }
+    };
 
     type MenuItem = { icon: string; label: string; color: string; value?: string; onPress?: () => void };
     const menuSections: { title: string; items: MenuItem[] }[] = [
         {
             title: 'Account',
             items: [
-                { icon: 'shield-checkmark-outline', label: 'Verification', value: prefs.email_verified ? 'Verified ✓' : 'Not Verified', color: prefs.email_verified ? Colors.success : Colors.warning },
+                { icon: 'shield-checkmark-outline', label: 'Verification', value: prefs.email_verified ? 'Verified ✓' : 'Not Verified', color: prefs.email_verified ? Colors.success : Colors.warning, onPress: () => router.push('/verification') },
                 { icon: 'diamond-outline', label: 'Subscription', value: subscription?.plan || 'Free', color: Colors.accent },
                 { icon: 'call-outline', label: 'Phone', value: prefs.phone || 'Not set', color: Colors.secondary },
             ],
@@ -123,10 +186,10 @@ export default function ProfileScreen() {
         {
             title: 'Settings',
             items: [
-                { icon: 'notifications-outline', label: 'Notifications', onPress: () => { }, color: Colors.primary },
-                { icon: 'globe-outline', label: 'Visit Website', onPress: () => Linking.openURL('https://avasplot.com'), color: Colors.secondary },
-                { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => { }, color: Colors.success },
-                { icon: 'document-text-outline', label: 'Privacy Policy', onPress: () => { }, color: Colors.textMuted },
+                { icon: 'notifications-outline', label: 'Notifications', onPress: () => router.push('/notifications'), color: Colors.primary },
+                { icon: 'globe-outline', label: 'Visit Website', onPress: () => Linking.openURL('https://avasplot.in'), color: Colors.secondary },
+                { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => router.push('/help'), color: Colors.success },
+                { icon: 'document-text-outline', label: 'Privacy Policy', onPress: () => router.push('/privacy'), color: Colors.textMuted },
             ],
         },
     ];
@@ -142,15 +205,31 @@ export default function ProfileScreen() {
                         end={{ x: 1, y: 1 }}
                         style={styles.profileCardBg}
                     />
-                    <View style={styles.avatarContainer}>
-                        <LinearGradient
-                            colors={[roleColor, Colors.primary]}
-                            style={styles.avatarGradient}
-                        >
-                            <Text style={styles.avatarText}>{initials}</Text>
-                        </LinearGradient>
+                    <TouchableOpacity style={styles.avatarContainer} onPress={handleChangePhoto} activeOpacity={0.8}>
+                        {avatarUrl ? (
+                            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                        ) : (
+                            <LinearGradient
+                                colors={[roleColor, Colors.primary]}
+                                style={styles.avatarGradient}
+                            >
+                                <Text style={styles.avatarText}>{initials}</Text>
+                            </LinearGradient>
+                        )}
+                        <View style={styles.cameraOverlay}>
+                            {uploadingPhoto ? (
+                                <ActivityIndicator size="small" color="#FFF" />
+                            ) : (
+                                <Ionicons name="camera" size={14} color="#FFF" />
+                            )}
+                        </View>
+                    </TouchableOpacity>
+                    <View style={styles.nameRow}>
+                        <Text style={styles.userName}>{user?.name || 'User'}</Text>
+                        {prefs?.email_verified && (
+                            <Ionicons name="checkmark-circle" size={18} color={Colors.success} style={styles.verifiedIcon} />
+                        )}
                     </View>
-                    <Text style={styles.userName}>{user?.name || 'User'}</Text>
                     <Text style={styles.userEmail}>{user?.email}</Text>
                     {prefs.role && (
                         <View style={styles.roleBadge}>
@@ -188,6 +267,36 @@ export default function ProfileScreen() {
                         </View>
                     </View>
                 ))}
+
+                {/* Professional Details Section */}
+                <View style={styles.menuSection}>
+                    <Text style={styles.sectionTitle}>Details</Text>
+                    <View style={styles.detailsCard}>
+                        <Text style={styles.inputLabel}>Office Address</Text>
+                        <TextInput
+                            style={styles.detailInput}
+                            placeholder="Enter your full office address"
+                            value={address}
+                            onChangeText={setAddress}
+                            multiline
+                            textAlignVertical="top"
+                        />
+                        <Text style={styles.inputLabel}>License / RERA Number</Text>
+                        <TextInput
+                            style={styles.detailInput}
+                            placeholder="e.g. RERA-123456"
+                            value={license}
+                            onChangeText={setLicense}
+                        />
+                        <TouchableOpacity
+                            style={styles.saveBtn}
+                            onPress={handleSaveDetails}
+                            disabled={savingDetails}
+                        >
+                            <Text style={styles.saveBtnText}>{savingDetails ? 'Saving...' : 'Save Details'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
 
                 {/* My Listings Section */}
                 <View style={styles.menuSection}>
@@ -279,14 +388,27 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         opacity: 0.15,
     },
-    avatarContainer: { marginBottom: Spacing.lg },
+    avatarContainer: { marginBottom: Spacing.lg, position: 'relative' },
     avatarGradient: {
         width: 80, height: 80, borderRadius: 40,
         justifyContent: 'center', alignItems: 'center',
         ...Shadows.glow,
     },
+    avatarImage: {
+        width: 80, height: 80, borderRadius: 40,
+        ...Shadows.glow,
+    },
     avatarText: { ...Typography.h1, color: '#FFF' },
-    userName: { ...Typography.h2, color: Colors.text, marginBottom: 4 },
+    cameraOverlay: {
+        position: 'absolute', bottom: 0, right: -4,
+        width: 28, height: 28, borderRadius: 14,
+        backgroundColor: Colors.primary,
+        justifyContent: 'center', alignItems: 'center',
+        borderWidth: 2, borderColor: Colors.surface,
+    },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 4 },
+    verifiedIcon: { marginTop: 2 },
+    userName: { ...Typography.h2, color: Colors.text },
     userEmail: { ...Typography.caption, color: Colors.textSecondary, marginBottom: Spacing.md },
     roleBadge: {
         backgroundColor: Colors.glass,
@@ -347,8 +469,44 @@ const styles = StyleSheet.create({
         borderColor: Colors.glassBorder,
         gap: Spacing.md,
     },
-    emptyText: { ...Typography.body, color: Colors.textSecondary },
-
+    emptyText: {
+        ...Typography.body,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+    },
+    detailsCard: {
+        backgroundColor: Colors.surface,
+        borderRadius: BorderRadius.xl,
+        padding: Spacing.xl,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        gap: Spacing.md,
+    },
+    inputLabel: {
+        ...Typography.captionBold,
+        color: Colors.textSecondary,
+    },
+    detailInput: {
+        backgroundColor: Colors.background,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        borderRadius: BorderRadius.md,
+        padding: Spacing.md,
+        ...Typography.body,
+        color: Colors.text,
+        minHeight: 48,
+    },
+    saveBtn: {
+        backgroundColor: Colors.primary,
+        borderRadius: BorderRadius.md,
+        paddingVertical: Spacing.md,
+        alignItems: 'center',
+        marginTop: Spacing.sm,
+    },
+    saveBtnText: {
+        ...Typography.bodyBold,
+        color: '#FFF',
+    },
     listingCard: {
         backgroundColor: Colors.surface,
         borderRadius: BorderRadius.lg,

@@ -22,8 +22,8 @@ export const ENV = {
     },
   },
   gemini: {
-    apiKey: 'AIzaSyDLB6yhhq1zWlKdzLVbAvUbUIJh66cs5g4',
-    model: 'gemini-flash-latest',
+    apiKey: 'AIzaSyBBanKc5v9t4jXoUUxbR-dRL2OlFAZDViw',
+    model: 'gemini-2.0-flash',
   },
   googleMaps: {
     apiKey: 'AIzaSyDh_nsaHVRivjzobvQY_PoedXVom7wHv5U',
