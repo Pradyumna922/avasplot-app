@@ -22,8 +22,8 @@ export const ENV = {
     },
   },
   gemini: {
-    apiKey: 'AIzaSyDLB6yhhq1zWlKdzLVbAvUbUIJh66cs5g4',
-    model: 'gemini-1.5-flash',
+    apiKey: 'AIzaSyBBanKc5v9t4jXoUUxbR-dRL2OlFAZDViw',
+    model: 'gemini-2.0-flash',
   },
   razorpay: {
     keyId: 'rzp_test_YOUR_KEY_HERE', // Replace with your Razorpay Test/Live Key ID

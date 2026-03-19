@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -94,7 +95,7 @@ export default function ChatbotScreen() {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior="padding"
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
             {/* Header */}
@@ -103,7 +104,10 @@ export default function ChatbotScreen() {
                     <Ionicons name="close" size={24} color={Colors.text} />
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Ionicons name="hardware-chip" size={24} color={Colors.primary} />
+                    <Image
+                        source={require('../assets/images/avas-ai-avatar.png')}
+                        style={styles.headerAvatar}
+                    />
                     <Text style={styles.headerTitle}>Avas AI Guide</Text>
                 </View>
                 <View style={{ width: 40 }} />
@@ -115,6 +119,7 @@ export default function ChatbotScreen() {
                 style={styles.chatContainer}
                 contentContainerStyle={styles.chatContent}
                 onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+                keyboardShouldPersistTaps="handled"
             >
                 {messages.map((msg) => (
                     <View
@@ -125,9 +130,10 @@ export default function ChatbotScreen() {
                         ]}
                     >
                         {msg.sender === 'ai' && (
-                            <View style={styles.aiAvatar}>
-                                <Ionicons name="hardware-chip" size={16} color="#FFF" />
-                            </View>
+                            <Image
+                                source={require('../assets/images/avas-ai-avatar.png')}
+                                style={styles.aiAvatarImage}
+                            />
                         )}
                         <View
                             style={[
@@ -147,9 +153,10 @@ export default function ChatbotScreen() {
 
                 {isLoading && (
                     <View style={[styles.messageRow, styles.messageRowAi]}>
-                        <View style={styles.aiAvatar}>
-                            <Ionicons name="hardware-chip" size={16} color="#FFF" />
-                        </View>
+                        <Image
+                            source={require('../assets/images/avas-ai-avatar.png')}
+                            style={styles.aiAvatarImage}
+                        />
                         <View style={[styles.messageBubble, styles.bubbleAi, { padding: Spacing.md }]}>
                             <ActivityIndicator size="small" color={Colors.primary} />
                         </View>
@@ -244,11 +251,20 @@ const styles = StyleSheet.create({
         gap: Spacing.sm,
     },
     aiAvatar: {
-        width: 28, height: 28,
-        borderRadius: 14,
+        width: 32, height: 32,
+        borderRadius: 16,
         backgroundColor: Colors.primary,
         justifyContent: 'center', alignItems: 'center',
         marginBottom: 4,
+    },
+    aiAvatarImage: {
+        width: 32, height: 32,
+        borderRadius: 16,
+        marginBottom: 4,
+    },
+    headerAvatar: {
+        width: 28, height: 28,
+        borderRadius: 14,
     },
     messageBubble: {
         padding: Spacing.lg,

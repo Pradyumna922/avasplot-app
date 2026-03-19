@@ -28,10 +28,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
+import { useNotifications } from '../../src/context/NotificationContext';
 import { formatArea, formatPrice, properties, subscriptions, timeAgo } from '../../src/services/appwrite';
 import { openRazorpayCheckout } from '../../src/services/razorpay';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
-import { Property } from '../../src/types';
+import { Property, PROPERTY_TYPES } from '../../src/types';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - Spacing.xl * 2;
@@ -478,8 +479,8 @@ const howItWorksSteps = [
 
 export default function HomeScreen() {
   // Main Tabs State
-  const topTabs = ['Plots', 'Services', 'Franchise', 'Scouts', 'Premium'];
-  const [mainTab, setMainTab] = useState<'Plots' | 'Services' | 'Franchise' | 'Scouts' | 'Premium'>('Plots');
+  const topTabs = ['Plots', 'Services', 'Franchise', 'Scouts'];
+  const [mainTab, setMainTab] = useState<'Plots' | 'Services' | 'Franchise' | 'Scouts'>('Plots');
   const [selectedServiceCategory, setSelectedServiceCategory] = useState('All Services');
 
 
@@ -509,9 +510,10 @@ export default function HomeScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [compareList, setCompareList] = useState<Property[]>([]);
 
-  const { user, isLoggedIn } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user, isLoggedIn, prefs } = useAuth();
+  const { unreadCount } = useNotifications();
   const scrollY = useRef(new Animated.Value(0)).current;
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
@@ -651,9 +653,9 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={[styles.headerLeft, { flexDirection: 'row', alignItems: 'center', gap: Spacing.md }]}>
-          <Image 
-            source={require('../../assets/images/new-logo-transparent.png')} 
-            style={{ width: 48, height: 48, resizeMode: 'contain' }} 
+          <Image
+            source={require('../../assets/images/new-logo-transparent.png')}
+            style={{ width: 48, height: 48, resizeMode: 'contain' }}
           />
           <View>
             <Text style={styles.greeting}>
@@ -662,17 +664,33 @@ export default function HomeScreen() {
             <Text style={[styles.appName, { fontSize: 24 }]}>AvasPlot</Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.avatarButton}
-          onPress={() => isLoggedIn ? router.push('/(tabs)/profile') : router.push('/(auth)/login')}
-        >
-          <LinearGradient
-            colors={[Colors.primary, Colors.secondary]}
-            style={styles.avatar}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+          <TouchableOpacity
+            style={styles.notificationBtn}
+            onPress={() => router.push('/notifications')}
           >
-            <Ionicons name="person" size={18} color="#FFF" />
-          </LinearGradient>
-        </TouchableOpacity>
+            <Ionicons name="notifications-outline" size={24} color={Colors.text} />
+            {isLoggedIn && unreadCount > 0 && <View style={styles.notificationDot} />}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.avatarButton}
+            onPress={() => isLoggedIn ? router.push('/(tabs)/profile') : router.push('/(auth)/login')}
+          >
+            {isLoggedIn && prefs.avatarUrl ? (
+              <Image
+                source={{ uri: prefs.avatarUrl }}
+                style={styles.avatar}
+              />
+            ) : (
+              <LinearGradient
+                colors={[Colors.primary, Colors.secondary]}
+                style={styles.avatar}
+              >
+                <Ionicons name="person" size={18} color="#FFF" />
+              </LinearGradient>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* HEADER TABS (Plots, Services, etc) */}
@@ -844,12 +862,10 @@ export default function HomeScreen() {
             onPress={() => router.push('/chat')}
             activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={[Colors.primary, Colors.primaryDark]}
+            <Image
+              source={require('../../assets/images/avas-ai-avatar.png')}
               style={styles.fabGradient}
-            >
-              <Ionicons name="hardware-chip" size={24} color="#FFF" />
-            </LinearGradient>
+            />
           </TouchableOpacity>
         </>
       ) : mainTab === 'Services' ? (
@@ -1147,7 +1163,7 @@ export default function HomeScreen() {
             <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.franCtaBlock}>
               <Text style={styles.franCtaTitle}>Ready to Start Earning?</Text>
               <Text style={styles.franCtaSub}>Join the Scout Program today and monetize your local knowledge.</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.franEmailBtn, { backgroundColor: Colors.primary }]}
                 onPress={() => setIsScoutFormVisible(true)}
               >
@@ -1257,53 +1273,53 @@ export default function HomeScreen() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Spacing.xl }}>
               <View style={styles.filterSection}>
                 <Text style={styles.proSubtitle}>Land Location *</Text>
-                <TextInput 
-                  style={styles.filterInput} 
-                  placeholder="e.g., Survey No. 123, Village Name, City" 
-                  value={scoutLocation} 
-                  onChangeText={setScoutLocation} 
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="e.g., Survey No. 123, Village Name, City"
+                  value={scoutLocation}
+                  onChangeText={setScoutLocation}
                 />
               </View>
 
               <View style={styles.filterSection}>
                 <Text style={styles.proSubtitle}>Owner Contact (if available)</Text>
-                <TextInput 
-                  style={styles.filterInput} 
-                  placeholder="Phone number or name" 
-                  value={scoutContact} 
-                  onChangeText={setScoutContact} 
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="Phone number or name"
+                  value={scoutContact}
+                  onChangeText={setScoutContact}
                 />
               </View>
 
               <View style={styles.filterRow}>
                 <View style={[styles.filterSection, { flex: 1 }]}>
                   <Text style={styles.proSubtitle}>Estimated Price</Text>
-                  <TextInput 
-                    style={styles.filterInput} 
-                    placeholder="Approx Value" 
-                    value={scoutPrice} 
-                    onChangeText={setScoutPrice} 
+                  <TextInput
+                    style={styles.filterInput}
+                    placeholder="Approx Value"
+                    value={scoutPrice}
+                    onChangeText={setScoutPrice}
                   />
                 </View>
                 <View style={[styles.filterSection, { flex: 1 }]}>
                   <Text style={styles.proSubtitle}>Plot Size</Text>
-                  <TextInput 
-                    style={styles.filterInput} 
-                    placeholder="Approx Area" 
-                    value={scoutSize} 
-                    onChangeText={setScoutSize} 
+                  <TextInput
+                    style={styles.filterInput}
+                    placeholder="Approx Area"
+                    value={scoutSize}
+                    onChangeText={setScoutSize}
                   />
                 </View>
               </View>
 
               <View style={styles.filterSection}>
                 <Text style={styles.proSubtitle}>Additional Notes</Text>
-                <TextInput 
-                  style={[styles.filterInput, { height: 100, textAlignVertical: 'top' }]} 
-                  placeholder="Any additional information..." 
+                <TextInput
+                  style={[styles.filterInput, { height: 100, textAlignVertical: 'top' }]}
+                  placeholder="Any additional information..."
                   multiline
-                  value={scoutNotes} 
-                  onChangeText={setScoutNotes} 
+                  value={scoutNotes}
+                  onChangeText={setScoutNotes}
                 />
               </View>
 
@@ -1315,10 +1331,10 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.franEmailBtn, { backgroundColor: Colors.primary, marginTop: Spacing.xl }]}
                 onPress={() => {
-                  if(!scoutLocation) {
+                  if (!scoutLocation) {
                     Alert.alert('Required Field', 'Please provide a land location.');
                     return;
                   }
@@ -1429,6 +1445,28 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  notificationBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    position: 'relative',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.error,
+    borderWidth: 1,
+    borderColor: Colors.surface,
   },
 
   searchContainer: {
@@ -1974,13 +2012,17 @@ const styles = StyleSheet.create({
   topTabsContainer: {
     backgroundColor: Colors.surface,
     paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    marginBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     zIndex: 2,
   },
   topTabsScroll: {
     paddingHorizontal: Spacing.xl,
-    gap: Spacing.xl,
+    gap: Spacing.md,
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
   topTabBtn: {
     paddingVertical: Spacing.sm,
