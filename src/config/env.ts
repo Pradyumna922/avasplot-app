@@ -23,7 +23,10 @@ export const ENV = {
   },
   gemini: {
     apiKey: 'AIzaSyDLB6yhhq1zWlKdzLVbAvUbUIJh66cs5g4',
-    model: 'gemini-flash-latest',
+    model: 'gemini-1.5-flash',
+  },
+  razorpay: {
+    keyId: 'rzp_test_YOUR_KEY_HERE', // Replace with your Razorpay Test/Live Key ID
   },
   googleMaps: {
     apiKey: 'AIzaSyDh_nsaHVRivjzobvQY_PoedXVom7wHv5U',

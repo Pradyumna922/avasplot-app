@@ -28,7 +28,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
-import { formatArea, formatPrice, properties, timeAgo } from '../../src/services/appwrite';
+import { formatArea, formatPrice, properties, subscriptions, timeAgo } from '../../src/services/appwrite';
+import { openRazorpayCheckout } from '../../src/services/razorpay';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
 import { Property } from '../../src/types';
 
@@ -512,6 +513,52 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+
+  const handleSubscribe = async () => {
+    if (!isLoggedIn || !user) {
+      Alert.alert('Sign In Required', 'Please sign in to subscribe to Premium.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    setSubscriptionLoading(true);
+    try {
+      const result = await openRazorpayCheckout(
+        user.email ?? '',
+        user.name ?? 'AvasPlot User',
+        {
+          name: 'Citizen Membership',
+          description: 'AvasPlot Premium — 1 Month',
+          amount: 499900, // ₹4999 in paise
+        }
+      );
+      if (result.success) {
+        // Record subscription in Appwrite
+        try {
+          await subscriptions.create(
+            user.$id,
+            'citizen_monthly',
+            result.paymentId ?? `manual_${Date.now()}`
+          );
+        } catch (dbErr) {
+          console.warn('Could not save subscription to DB:', dbErr);
+        }
+        Alert.alert(
+          '🎉 Welcome to Premium!',
+          'Your Citizen Membership is now active. Enjoy AI insights, legal consults, and more.',
+          [{ text: 'Awesome!' }]
+        );
+      } else {
+        Alert.alert('Payment Cancelled', result.message ?? 'The payment was not completed.');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
 
   const handleToggleFavorite = useCallback((id: string) => {
     setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -1121,10 +1168,19 @@ export default function HomeScreen() {
               <Text style={[styles.franSub, { color: '#FDE68A', marginTop: 0 }]}>per month</Text>
             </View>
             <TouchableOpacity 
-              style={[styles.franEmailBtn, { backgroundColor: Colors.primary, marginTop: Spacing.xl, paddingHorizontal: Spacing.xxl * 2 }]}
-              onPress={() => Alert.alert('Coming Soon', 'Premium features and citizen memberships are coming shortly!')}
+              style={[styles.franEmailBtn, { backgroundColor: Colors.primary, marginTop: Spacing.xl, paddingHorizontal: Spacing.xxl * 2, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }]}
+              onPress={handleSubscribe}
+              disabled={subscriptionLoading}
+              activeOpacity={0.8}
             >
-              <Text style={[styles.franEmailTxt, { color: '#FFF' }]}>Subscribe Now</Text>
+              {subscriptionLoading ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <Ionicons name="card-outline" size={18} color="#FFF" />
+              )}
+              <Text style={[styles.franEmailTxt, { color: '#FFF' }]}>
+                {subscriptionLoading ? 'Processing...' : 'Subscribe Now'}
+              </Text>
             </TouchableOpacity>
           </LinearGradient>
 

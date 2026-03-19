@@ -12,6 +12,7 @@ import {
     Alert,
     Animated,
     Dimensions,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -112,14 +113,11 @@ export default function LoginScreen() {
                     >
                         {/* Logo & Branding */}
                         <View style={styles.brandContainer}>
-                            <LinearGradient
-                                colors={[Colors.primary, Colors.secondary]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.logoGradient}
-                            >
-                                <Ionicons name="home" size={32} color="#FFF" />
-                            </LinearGradient>
+                            <Image 
+                                source={require('../../assets/images/new-logo-transparent.png')} 
+                                style={styles.logoImage} 
+                                resizeMode="contain" 
+                            />
                             <Text style={styles.brandName}>AvasPlot</Text>
                             <Text style={styles.brandTagline}>India's Smartest Property Platform</Text>
                         </View>
@@ -267,6 +265,11 @@ const styles = StyleSheet.create({
     brandContainer: {
         alignItems: 'center',
         marginBottom: Spacing.xxxl,
+    },
+    logoImage: {
+        width: 80,
+        height: 80,
+        marginBottom: Spacing.lg,
     },
     logoGradient: {
         width: 64,

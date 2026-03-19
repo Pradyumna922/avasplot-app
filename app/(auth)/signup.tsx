@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     Alert,
     Animated,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -100,14 +101,11 @@ export default function SignupScreen() {
                         </TouchableOpacity>
 
                         <View style={styles.header}>
-                            <LinearGradient
-                                colors={[Colors.accent, Colors.primary]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.logoGradient}
-                            >
-                                <Ionicons name="person-add" size={28} color="#FFF" />
-                            </LinearGradient>
+                            <Image 
+                                source={require('../../assets/images/new-logo-transparent.png')} 
+                                style={styles.logoImage} 
+                                resizeMode="contain" 
+                            />
                             <Text style={styles.title}>Create Account</Text>
                             <Text style={styles.subtitle}>Join India's smartest property community</Text>
                         </View>
@@ -233,6 +231,11 @@ const styles = StyleSheet.create({
     },
 
     header: { alignItems: 'center', marginBottom: Spacing.xxl },
+    logoImage: {
+        width: 80,
+        height: 80,
+        marginBottom: Spacing.lg,
+    },
     logoGradient: {
         width: 64,
         height: 64,

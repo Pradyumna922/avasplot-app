@@ -421,6 +421,29 @@ export const subscriptions = {
             return null;
         }
     },
+
+    async create(userId: string, plan: string, paymentId: string) {
+        const now = new Date();
+        const expiresAt = new Date(now);
+        expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 month subscription
+
+        return databases.createDocument(DB, COLL.subscriptions, ID.unique(), {
+            userId,
+            plan,
+            paymentId,
+            status: 'active',
+            startedAt: now.toISOString(),
+            expiresAt: expiresAt.toISOString(),
+        });
+    },
+
+    async isActive(userId: string): Promise<boolean> {
+        const sub = await this.get(userId);
+        if (!sub) return false;
+        if (sub.status !== 'active') return false;
+        if (sub.expiresAt && new Date(sub.expiresAt) < new Date()) return false;
+        return true;
+    },
 };
 
 // ============================================================================
