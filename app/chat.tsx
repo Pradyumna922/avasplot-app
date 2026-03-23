@@ -15,7 +15,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { geminiService } from '../src/services/gemini';
+import { groqService } from '../src/services/groq';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../src/theme';
 
 type Message = {
@@ -35,8 +35,8 @@ export default function ChatbotScreen() {
     const scrollViewRef = useRef<ScrollView>(null);
 
     useEffect(() => {
-        // Initialize the Gemini chat history session
-        const session = geminiService.startChatSession();
+        // Initialize the Groq chat history session
+        const session = groqService.startChatSession();
         setChatSession(session);
 
         // Add initial greeting from AI visually
@@ -66,7 +66,7 @@ export default function ChatbotScreen() {
         setIsLoading(true);
 
         try {
-            // Send message to Gemini session to maintain history
+            // Send message to Groq session to maintain history
             const result = await chatSession.sendMessage(userText);
             const responseText = result.response.text();
 

@@ -1,8 +1,11 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { ENV } from '../config/env';
 
-// Initialize the Google Generative AI SDK using the securely stored API Key
-const genAI = new GoogleGenerativeAI(ENV.gemini.apiKey);
+// Initialize the Groq SDK using the securely stored API Key
+const groq = new Groq({
+    apiKey: ENV.groq.apiKey,
+    dangerouslyAllowBrowser: true // For Expo/React Native projects
+});
 
 const SYSTEM_PROMPT = `
 You are Avas AI, an elite, professional, and knowledgeable Real Estate Assistant for AvasPlot.
@@ -16,50 +19,42 @@ Guidelines:
 5. Do NOT hallucinate specific property listings. Speak in general market guidelines unless the user explicitly provides property details.
 `;
 
-export const geminiService = {
+export const groqService = {
     /**
-     * Generates a single response from the Gemini model based on the user's prompt.
-     * This handles single-turn queries but keeps the core Avas System Instruction.
+     * Generates a single response from the Groq model based on the user's prompt.
      */
     async generateResponse(prompt: string): Promise<string> {
         try {
-            // Use the gemini model set in environment (usually gemini-1.5-flash)
-            const model = genAI.getGenerativeModel({
-                model: ENV.gemini.model,
-                systemInstruction: SYSTEM_PROMPT,
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: prompt }
+                ],
+                model: ENV.groq.model,
             });
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+            return chatCompletion.choices[0]?.message?.content || '';
         } catch (error) {
-            console.error('Gemini API Error:', error);
+            console.error('Groq API Error:', error);
             throw new Error('Failed to generate AI response.');
         }
     },
 
     /**
-     * Initializes a multi-turn chat session.
-     * Useful when we want the model to remember past user interactions.
+     * Replicates the multi-turn chat start.
+     * Note: For Groq, we handle history by passing the array of messages.
      */
     startChatSession() {
-        const model = genAI.getGenerativeModel({
-            model: ENV.gemini.model,
-            systemInstruction: SYSTEM_PROMPT,
-        });
-
-        return model.startChat({
-            history: [
-                {
-                    role: 'user',
-                    parts: [{ text: 'Hello!' }],
-                },
-                {
-                    role: 'model',
-                    parts: [{ text: 'Greetings! I am Avas AI. How can I help you find your dream property today?' }],
-                },
-            ],
-        });
+        return {
+            sendMessage: async (text: string) => {
+                const response = await groqService.generateResponse(text);
+                return {
+                    response: {
+                        text: () => response
+                    }
+                };
+            }
+        };
     },
 
     /**
@@ -67,37 +62,32 @@ export const geminiService = {
      */
     async generatePropertySummary(propertyData: any): Promise<string> {
         try {
-            const model = genAI.getGenerativeModel({
-                model: ENV.gemini.model,
-                systemInstruction: SYSTEM_PROMPT,
-            });
-
             const prompt = `Analyze this property and write a 2-sentence professional real estate summary:
 Title: ${propertyData.title}
 Location: ${propertyData.location}, ${propertyData.city || ''}
 Price: ${propertyData.price}
 Type: ${propertyData.type}`;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: prompt }
+                ],
+                model: ENV.groq.model,
+            });
+
+            return chatCompletion.choices[0]?.message?.content || 'AI Summary currently unavailable.';
         } catch (error) {
-            console.error('Gemini Summary Error:', error);
+            console.error('Groq Summary Error:', error);
             return 'AI Summary currently unavailable.';
         }
     },
 
     /**
      * Computes a pseudo-calculated Vastu score and 3-Year Future Price Forecast.
-     * Returns a JSON payload containing { vastuScore: number, forecast: Array<{ year, growthPct, priceStr }> }
      */
     async generateVastuAndGrowth(propertyData: any): Promise<{ vastuScore: number; forecast?: { year: number, growthPct: number, priceStr: string }[] }> {
         try {
-            const model = genAI.getGenerativeModel({
-                model: ENV.gemini.model,
-                systemInstruction: SYSTEM_PROMPT,
-            });
-
             const currentYear = new Date().getFullYear();
             const y1 = currentYear + 1;
             const y2 = currentYear + 2;
@@ -124,12 +114,19 @@ Return ONLY a valid JSON object matching EXACTLY this structure schema:
 }
 Do NOT return markdown or explanation.`;
 
-            const result = await model.generateContent(prompt);
-            const responseText = (await result.response).text().replace(/```json/gi, '').replace(/```/gi, '').trim();
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: prompt }
+                ],
+                model: ENV.groq.model,
+                response_format: { type: "json_object" }
+            });
+
+            const responseText = chatCompletion.choices[0]?.message?.content || '{}';
             return JSON.parse(responseText);
         } catch (error) {
-            console.error('Gemini Forecast Error:', error);
-            // Fallback defaults if generation fails
+            console.error('Groq Forecast Error:', error);
             const currentYear = new Date().getFullYear();
             return {
                 vastuScore: 80,
@@ -147,11 +144,6 @@ Do NOT return markdown or explanation.`;
      */
     async compareProperties(propA: any, propB: any): Promise<string> {
         try {
-            const model = genAI.getGenerativeModel({
-                model: ENV.gemini.model,
-                systemInstruction: SYSTEM_PROMPT,
-            });
-
             const prompt = `Act as an expert Real Estate Analyst. Compare these two properties side-by-side and provide a bulleted summary of their core differences and investment potential, followed by a final recommendation.
 
 Property A:
@@ -175,11 +167,17 @@ Format your response EXACTLY like this:
 
 Recommendation: Opt for [Property Name] for [Reason], or [Other Property] for [Other Reason].`;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text().trim();
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: prompt }
+                ],
+                model: ENV.groq.model,
+            });
+
+            return chatCompletion.choices[0]?.message?.content?.trim() || 'Comparative Analysis currently unavailable.';
         } catch (error) {
-            console.error('Gemini Compare Error:', error);
+            console.error('Groq Compare Error:', error);
             return 'Comparative Analysis currently unavailable.';
         }
     }

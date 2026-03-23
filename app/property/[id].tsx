@@ -34,7 +34,7 @@ if (Platform.OS !== 'web') {
     Marker = Maps.Marker;
     PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
 }
-import { geminiService } from '../../src/services/gemini';
+import { groqService } from '../../src/services/groq';
 import { formatArea, formatPrice, formatWhatsAppNumber, properties, timeAgo } from '../../src/services/appwrite';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
 import { Property } from '../../src/types';
@@ -124,7 +124,7 @@ export default function PropertyDetailScreen() {
         if (!property) return;
         setLoadingSummary(true);
         try {
-            const summary = await geminiService.generatePropertySummary(property);
+            const summary = await groqService.generatePropertySummary(property);
             setAiSummary(summary);
         } catch (error) {
             console.error(error);
@@ -137,7 +137,7 @@ export default function PropertyDetailScreen() {
         if (!property) return;
         setLoadingForecast(true);
         try {
-            const stats = await geminiService.generateVastuAndGrowth(property);
+            const stats = await groqService.generateVastuAndGrowth(property);
             setAiStats(stats);
         } catch (error) {
             console.error(error);

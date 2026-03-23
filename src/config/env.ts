@@ -25,6 +25,10 @@ export const ENV = {
     apiKey: 'AIzaSyBBanKc5v9t4jXoUUxbR-dRL2OlFAZDViw',
     model: 'gemini-2.0-flash',
   },
+  groq: {
+    apiKey: process.env.EXPO_PUBLIC_GROQ_API_KEY || 'MISSING_KEY',
+    model: 'llama-3.3-70b-versatile',
+  },
   razorpay: {
     keyId: 'rzp_test_YOUR_KEY_HERE', // Replace with your Razorpay Test/Live Key ID
   },

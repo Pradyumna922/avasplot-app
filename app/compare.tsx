@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatArea, formatPrice, properties } from '../src/services/appwrite';
-import { geminiService } from '../src/services/gemini';
+import { groqService } from '../src/services/groq';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../src/theme';
 import { Property } from '../src/types';
 
@@ -66,7 +66,7 @@ export default function ComparePropertiesScreen() {
         setIsAnalyzing(true);
         setAiAnalysis(null);
         try {
-            const result = await geminiService.compareProperties(propA, propB);
+            const result = await groqService.compareProperties(propA, propB);
             setAiAnalysis(result);
         } catch (error) {
             Alert.alert('AI Error', 'Failed to analyze properties.');
