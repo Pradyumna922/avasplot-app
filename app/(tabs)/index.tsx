@@ -30,7 +30,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { useNotifications } from '../../src/context/NotificationContext';
 import { formatArea, formatPrice, properties, subscriptions, timeAgo } from '../../src/services/appwrite';
-import { openRazorpayCheckout } from '../../src/services/razorpay';
+import { getPayUPaymentHtml } from '../../src/services/payu';
+import { PayUWebView } from '../../src/components/PayUWebView';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
 import { Property, PROPERTY_TYPES } from '../../src/types';
 
@@ -516,6 +517,7 @@ export default function HomeScreen() {
   const { unreadCount } = useNotifications();
   const scrollY = useRef(new Animated.Value(0)).current;
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [paymentHtml, setPaymentHtml] = useState<string | null>(null); // New state for PayUWebView
 
   const handleSubscribe = async () => {
     if (!isLoggedIn || !user) {
@@ -525,38 +527,43 @@ export default function HomeScreen() {
       ]);
       return;
     }
+
     setSubscriptionLoading(true);
     try {
-      const result = await openRazorpayCheckout(
+      const { html } = await getPayUPaymentHtml(
         user.email ?? '',
         user.name ?? 'AvasPlot User',
         {
           name: 'Citizen Membership',
           description: 'AvasPlot Premium — 1 Month',
-          amount: 499900, // ₹4999 in paise
+          amount: 4999,
         }
       );
-      if (result.success) {
-        // Record subscription in Appwrite
-        try {
-          await subscriptions.create(
-            user.$id,
-            'citizen_monthly',
-            result.paymentId ?? `manual_${Date.now()}`
-          );
-        } catch (dbErr) {
-          console.warn('Could not save subscription to DB:', dbErr);
-        }
-        Alert.alert(
-          '🎉 Welcome to Premium!',
-          'Your Citizen Membership is now active. Enjoy AI insights, legal consults, and more.',
-          [{ text: 'Awesome!' }]
-        );
-      } else {
-        Alert.alert('Payment Cancelled', result.message ?? 'The payment was not completed.');
-      }
+      setPaymentHtml(html);
     } catch (err) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert('Error', 'Something went wrong while preparing payment.');
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const handlePaymentSuccess = async (paymentId: string) => {
+    setPaymentHtml(null); // Close the WebView
+    setSubscriptionLoading(true);
+    try {
+      await subscriptions.create(
+        user?.$id ?? '',
+        'citizen_monthly',
+        paymentId
+      );
+      Alert.alert(
+        '🎉 Welcome to Premium!',
+        'Your Citizen Membership is now active. Enjoy AI insights, legal consults, and more.',
+        [{ text: 'Awesome!' }]
+      );
+    } catch (dbErr) {
+      console.warn('Could not save subscription to DB:', dbErr);
+      Alert.alert('Almost Done!', 'Your payment was successful, but we had trouble updating your profile.');
     } finally {
       setSubscriptionLoading(false);
     }
@@ -1397,6 +1404,16 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      <PayUWebView
+        visible={!!paymentHtml}
+        html={paymentHtml || ''}
+        onClose={() => setPaymentHtml(null)}
+        onSuccess={handlePaymentSuccess}
+        onFailure={(msg) => {
+          setPaymentHtml(null);
+          Alert.alert('Payment Failed', msg);
+        }}
+      />
     </View>
   );
 }

@@ -15,10 +15,71 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/context/AuthContext';
+import { getPayUPaymentHtml } from '../../src/services/payu';
+import { subscriptions } from '../../src/services/appwrite';
+import { PayUWebView } from '../../src/components/PayUWebView';
 import { BorderRadius, Colors, Spacing, Typography } from '../../src/theme';
 
 export default function PremiumScreen() {
     const insets = useSafeAreaInsets();
+    const router = useRouter();
+    const { user, isLoggedIn } = useAuth();
+    const [loading, setLoading] = React.useState(false);
+    const [paymentHtml, setPaymentHtml] = React.useState<string | null>(null);
+    const [currentTxnid, setCurrentTxnid] = React.useState<string | null>(null);
+
+    const handleSubscribe = async () => {
+        if (!isLoggedIn || !user) {
+            Alert.alert('Sign In Required', 'Please sign in to subscribe to Premium.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+            ]);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { html, txnid } = await getPayUPaymentHtml(
+                user.email ?? '',
+                user.name ?? 'AvasPlot User',
+                {
+                    name: 'Citizen Membership',
+                    description: 'AvasPlot Premium — 1 Month',
+                    amount: 4999,
+                }
+            );
+            setPaymentHtml(html);
+            setCurrentTxnid(txnid);
+        } catch (err) {
+            Alert.alert('Error', 'Something went wrong while preparing payment.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePaymentSuccess = async (paymentId: string) => {
+        setPaymentHtml(null);
+        setLoading(true);
+        try {
+            await subscriptions.create(
+                user?.$id ?? '',
+                'citizen_monthly',
+                paymentId
+            );
+            Alert.alert(
+                '🎉 Welcome to Premium!',
+                'Your Citizen Membership is now active. Enjoy AI insights, legal consults, and more.',
+                [{ text: 'Awesome!' }]
+            );
+        } catch (dbErr) {
+            console.warn('Could not save subscription to DB:', dbErr);
+            Alert.alert('Almost Done!', 'Your payment was successful, but we had trouble updating your profile. Our team will verify it shortly.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -33,11 +94,14 @@ export default function PremiumScreen() {
                         <Text style={[styles.franSub, { color: '#FDE68A', marginTop: 0 }]}>per month</Text>
                     </View>
                     <TouchableOpacity
-                        style={[styles.franEmailBtn, { backgroundColor: Colors.primary, marginTop: Spacing.xl, paddingHorizontal: Spacing.xxl * 2 }]}
-                        onPress={() => Alert.alert('Coming Soon', 'Premium features and citizen memberships are coming shortly!')}
+                        style={[styles.franEmailBtn, { backgroundColor: Colors.primary, marginTop: Spacing.xl, paddingHorizontal: Spacing.xxl * 2, opacity: loading ? 0.7 : 1 }]}
+                        onPress={handleSubscribe}
+                        disabled={loading}
                         activeOpacity={0.85}
                     >
-                        <Text style={[styles.franEmailTxt, { color: '#FFF' }]}>Subscribe Now</Text>
+                        <Text style={[styles.franEmailTxt, { color: '#FFF' }]}>
+                            {loading ? 'Processing...' : 'Subscribe Now'}
+                        </Text>
                     </TouchableOpacity>
                 </LinearGradient>
 
@@ -98,6 +162,17 @@ export default function PremiumScreen() {
                     </View>
                 </View>
             </ScrollView>
+
+            <PayUWebView
+                visible={!!paymentHtml}
+                html={paymentHtml || ''}
+                onClose={() => setPaymentHtml(null)}
+                onSuccess={handlePaymentSuccess}
+                onFailure={(msg) => {
+                    setPaymentHtml(null);
+                    Alert.alert('Payment Failed', msg);
+                }}
+            />
         </View>
     );
 }

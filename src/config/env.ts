@@ -29,8 +29,10 @@ export const ENV = {
     apiKey: process.env.EXPO_PUBLIC_GROQ_API_KEY || 'MISSING_KEY',
     model: 'llama-3.3-70b-versatile',
   },
-  razorpay: {
-    keyId: 'rzp_test_YOUR_KEY_HERE', // Replace with your Razorpay Test/Live Key ID
+  payu: {
+    key: 'gtKFFx', // PayU Test Key
+    salt: '4R38IvwiV57FwVpsgOvTXBdLE4tHUXFW', // Standard PayU Test Salt
+    sandbox: true, 
   },
   googleMaps: {
     apiKey: 'AIzaSyDh_nsaHVRivjzobvQY_PoedXVom7wHv5U',
