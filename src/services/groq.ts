@@ -1,11 +1,48 @@
-import Groq from 'groq-sdk';
+// ============================================================================
+// 🤖 GROQ AI SERVICE — Using fetch() for React Native compatibility
+// ============================================================================
+// NOTE: We use direct fetch() instead of groq-sdk because groq-sdk relies on
+// Node.js APIs (fs, net, http) that crash in EAS/native builds.
+
 import { ENV } from '../config/env';
 
-// Initialize the Groq SDK using the securely stored API Key
-const groq = new Groq({
-    apiKey: ENV.groq.apiKey,
-    dangerouslyAllowBrowser: true // For Expo/React Native projects
-});
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+interface ChatMessage {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+}
+
+interface GroqChatOptions {
+    response_format?: { type: string };
+}
+
+/**
+ * Makes a direct REST API call to Groq's chat completions endpoint.
+ * Drop-in replacement for groq.chat.completions.create().
+ */
+async function groqChat(messages: ChatMessage[], options?: GroqChatOptions) {
+    const res = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${ENV.groq.apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: ENV.groq.model,
+            messages,
+            ...(options?.response_format ? { response_format: options.response_format } : {}),
+        }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.text();
+        console.error('Groq API HTTP error:', res.status, errorData);
+        throw new Error(`Groq API error: ${res.status}`);
+    }
+
+    return res.json();
+}
 
 const SYSTEM_PROMPT = `
 You are Avas AI, an elite, professional, and knowledgeable Real Estate Assistant for AvasPlot.
@@ -25,13 +62,10 @@ export const groqService = {
      */
     async generateResponse(prompt: string): Promise<string> {
         try {
-            const chatCompletion = await groq.chat.completions.create({
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: prompt }
-                ],
-                model: ENV.groq.model,
-            });
+            const chatCompletion = await groqChat([
+                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'user', content: prompt }
+            ]);
 
             return chatCompletion.choices[0]?.message?.content || '';
         } catch (error) {
@@ -68,13 +102,10 @@ Location: ${propertyData.location}, ${propertyData.city || ''}
 Price: ${propertyData.price}
 Type: ${propertyData.type}`;
 
-            const chatCompletion = await groq.chat.completions.create({
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: prompt }
-                ],
-                model: ENV.groq.model,
-            });
+            const chatCompletion = await groqChat([
+                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'user', content: prompt }
+            ]);
 
             return chatCompletion.choices[0]?.message?.content || 'AI Summary currently unavailable.';
         } catch (error) {
@@ -114,14 +145,13 @@ Return ONLY a valid JSON object matching EXACTLY this structure schema:
 }
 Do NOT return markdown or explanation.`;
 
-            const chatCompletion = await groq.chat.completions.create({
-                messages: [
+            const chatCompletion = await groqChat(
+                [
                     { role: 'system', content: SYSTEM_PROMPT },
                     { role: 'user', content: prompt }
                 ],
-                model: ENV.groq.model,
-                response_format: { type: "json_object" }
-            });
+                { response_format: { type: "json_object" } }
+            );
 
             const responseText = chatCompletion.choices[0]?.message?.content || '{}';
             return JSON.parse(responseText);
@@ -167,13 +197,10 @@ Format your response EXACTLY like this:
 
 Recommendation: Opt for [Property Name] for [Reason], or [Other Property] for [Other Reason].`;
 
-            const chatCompletion = await groq.chat.completions.create({
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: prompt }
-                ],
-                model: ENV.groq.model,
-            });
+            const chatCompletion = await groqChat([
+                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'user', content: prompt }
+            ]);
 
             return chatCompletion.choices[0]?.message?.content?.trim() || 'Comparative Analysis currently unavailable.';
         } catch (error) {

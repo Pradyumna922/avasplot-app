@@ -5,13 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "avasplot",
+    "scheme": ["avasplot", "appwrite-callback-6943ba3f0029a6697ddb"],
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.avasplot.app",
       "config": {
         "googleMapsApiKey": "AIzaSyDbSAs89iY3bT5fUCO-RgW-BvFCHvEIv_M"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -22,13 +25,15 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.avasplot.app",
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDbSAs89iY3bT5fUCO-RgW-BvFCHvEIv_M"
         }
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -54,6 +59,18 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "789c0b0b-1068-46a1-b86b-c5eba2b8de5f"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/789c0b0b-1068-46a1-b86b-c5eba2b8de5f"
     }
   }
 }

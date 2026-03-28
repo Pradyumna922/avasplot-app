@@ -17,9 +17,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
-import { leads, timeAgo } from '../../src/services/appwrite';
+import { leads, timeAgo, testAppwritePing } from '../../src/services/appwrite';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../src/theme';
 import { Lead, LEAD_STATUS_COLORS, ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from '../../src/types';
+
+import { Alert } from 'react-native';
 
 export default function DashboardScreen() {
     const { user, isLoggedIn, prefs } = useAuth();
@@ -30,6 +32,20 @@ export default function DashboardScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
+
+    // Appwrite Ping Handler
+    const handlePing = async () => {
+        try {
+            const result = await testAppwritePing();
+            if (result && result.status === 'pass') {
+                Alert.alert('Appwrite Ping', 'Connection successful!');
+            } else {
+                Alert.alert('Appwrite Ping', 'Ping failed or unexpected response.');
+            }
+        } catch (err) {
+            Alert.alert('Appwrite Ping', 'Ping failed: ' + (err?.message || err));
+        }
+    };
 
     const loadLeads = useCallback(async () => {
         if (!user?.$id) return;
@@ -203,7 +219,13 @@ export default function DashboardScreen() {
     };
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { paddingTop: insets.top }]}> 
+            {/* Appwrite Ping Button */}
+            <View style={{ alignItems: 'center', marginVertical: 12 }}>
+                <TouchableOpacity onPress={handlePing} style={{ backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Send a ping</Text>
+                </TouchableOpacity>
+            </View>
             {/* Premium Header */}
             <LinearGradient
                 colors={[roleColor, Colors.primaryDark]}
