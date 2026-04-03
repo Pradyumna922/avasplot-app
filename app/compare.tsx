@@ -233,6 +233,7 @@ export default function ComparePropertiesScreen() {
                                     <Text style={styles.aiRecText}>{aiParsed.recommendation}</Text>
                                 </View>
                             )}
+                            <Text style={{ fontSize: 8, color: '#94A3B8', textAlign: 'center', marginTop: Spacing.md, lineHeight: 12 }}>⚠ AI-generated analysis may contain errors. This is not professional advice. Always consult a qualified expert before making investment decisions.</Text>
                         </View>
                     )}
 

@@ -113,6 +113,11 @@ export default function ChatbotScreen() {
                 <View style={{ width: 40 }} />
             </View>
 
+            {/* AI Disclaimer Banner */}
+            <View style={{ backgroundColor: '#FEF3C7', paddingVertical: 6, paddingHorizontal: Spacing.lg }}>
+              <Text style={{ fontSize: 9, color: '#92400E', textAlign: 'center', lineHeight: 14 }}>⚠ Avas AI may produce inaccurate information. Do not treat responses as professional advice. Always verify independently.</Text>
+            </View>
+
             {/* Chat Messages */}
             <ScrollView
                 ref={scrollViewRef}

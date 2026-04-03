@@ -115,6 +115,37 @@ Type: ${propertyData.type}`;
     },
 
     /**
+     * Generates a unique 1-line AVAS Insight for a property card.
+     * Designed to be short, punchy, and unique per property.
+     */
+    async generatePropertyInsight(propertyData: any): Promise<string> {
+        try {
+            const prompt = `You are a premium real estate AI advisor. Write exactly ONE short sentence (max 25 words) as an investment insight for this property. Be specific to this property's details. Do NOT use quotes.
+
+Title: ${propertyData.title || 'Land Plot'}
+Location: ${propertyData.location || 'Maharashtra'}, ${propertyData.city || ''}
+Price: ${propertyData.price || 'N/A'}
+Area: ${propertyData.area || 'N/A'} sqft
+Type: ${propertyData.type || 'residential'}
+Vastu: ${propertyData.vastu || 'Not specified'}
+
+Reply with ONLY the insight sentence, nothing else.`;
+
+            const chatCompletion = await groqChat([
+                { role: 'system', content: 'You are a concise real estate investment advisor. Respond with only a single short sentence.' },
+                { role: 'user', content: prompt }
+            ]);
+
+            const insight = chatCompletion.choices[0]?.message?.content?.trim() || '';
+            // Remove surrounding quotes if present
+            return insight.replace(/^["']|["']$/g, '');
+        } catch (error) {
+            console.error('Groq Insight Error:', error);
+            return '';
+        }
+    },
+
+    /**
      * Computes a pseudo-calculated Vastu score and 3-Year Future Price Forecast.
      */
     async generateVastuAndGrowth(propertyData: any): Promise<{ vastuScore: number; forecast?: { year: number, growthPct: number, priceStr: string }[] }> {
@@ -124,26 +155,36 @@ Type: ${propertyData.type}`;
             const y2 = currentYear + 2;
             const y3 = currentYear + 3;
 
-            const prompt = `Based strictly on the following property details in Maharashtra, India:
-Title: ${propertyData.title}
-Location: ${propertyData.location}, ${propertyData.city || ''}
-Type: ${propertyData.type}
-Current Price: ${propertyData.price}
+            const prompt = `You are a precise real estate market analyst specializing in Maharashtra, India. Analyze this property using realistic local market data and infrastructure development patterns.
 
-Provide a calculated estimate for:
-1. Vastu Score (out of 100). If no direction is provided, assume a generic favorable score between 70-85.
-2. A 3-Year Market Forecast array extending for the years ${y1}, ${y2}, and ${y3}. Outline the projected growth percentage for each year sequentially, and estimate the new raw price string (e.g. "26.25 Cr" or "84.5 Lacs").
+Property Details:
+- Title: ${propertyData.title}
+- Location: ${propertyData.location}, ${propertyData.city || 'Maharashtra'}
+- Type: ${propertyData.type}
+- Current Price: ₹${propertyData.price}
+- Area: ${propertyData.area || 'N/A'} sqft
+- Pincode: ${propertyData.pincode || 'N/A'}
 
-Return ONLY a valid JSON object matching EXACTLY this structure schema:
+Instructions:
+1. Vastu Score (out of 100): If vastu direction is "${propertyData.vastu || 'not specified'}", calculate accordingly. East/North-facing = 80-95, West = 65-75, South = 55-70, Not specified = 70-80.
+2. 3-Year Market Forecast for years ${y1}, ${y2}, ${y3}:
+   - Base growth on Maharashtra real estate CAGR of 5-12% depending on location tier.
+   - Tier-1 cities (Mumbai, Pune): 5-8% annual growth.
+   - Tier-2 cities (Nashik, Nagpur, Aurangabad): 8-12% annual growth.
+   - Factor in property type: Commercial properties grow 1-2% faster than residential.
+   - Calculate precise projected prices from the current price of ₹${propertyData.price}.
+   - Use realistic price strings with proper Indian notation (e.g., "26.25 Lacs", "1.05 Cr").
+
+Return ONLY a valid JSON object matching EXACTLY this structure:
 {
-  "vastuScore": 85,
+  "vastuScore": 82,
   "forecast": [
-    { "year": ${y1}, "growthPct": 5, "priceStr": "26.25 Cr" },
-    { "year": ${y2}, "growthPct": 6, "priceStr": "27.82 Cr" },
-    { "year": ${y3}, "growthPct": 7, "priceStr": "29.77 Cr" }
+    { "year": ${y1}, "growthPct": 7, "priceStr": "26.75 Lacs" },
+    { "year": ${y2}, "growthPct": 8, "priceStr": "28.89 Lacs" },
+    { "year": ${y3}, "growthPct": 7, "priceStr": "30.91 Lacs" }
   ]
 }
-Do NOT return markdown or explanation.`;
+Do NOT return markdown, explanation, or any text outside the JSON.`;
 
             const chatCompletion = await groqChat(
                 [

@@ -286,6 +286,7 @@ export default function PropertyDetailScreen() {
                                 Get a quick AI-powered breakdown of this property's potential, pros, and cons.
                             </Text>
                         )}
+                        <Text style={{ fontSize: 8, color: '#64748B', textAlign: 'center', marginTop: Spacing.sm, lineHeight: 12 }}>⚠ AI-generated content may contain errors. Do not rely on this for financial or legal decisions. Verify independently.</Text>
                     </View>
 
                     {/* Dark Navy Market Forecast Block */}
@@ -335,6 +336,7 @@ export default function PropertyDetailScreen() {
                                         Estimated market value based on current growth patterns.
                                     </Text>
                                 </View>
+                                <Text style={{ fontSize: 8, color: '#64748B', textAlign: 'center', marginTop: Spacing.sm, lineHeight: 12 }}>⚠ AI-generated forecast. Actual market values may differ significantly. Not financial advice.</Text>
                             </View>
                         )}
                     </View>
