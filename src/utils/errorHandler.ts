@@ -209,63 +209,7 @@ export function promisify<T>(
   });
 }
 
-// ============================================================================
-// 🏥 ERROR BOUNDARY COMPONENT (React)
-// ============================================================================
 
-export interface ErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
-}
-
-export interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-/**
- * Usage:
- * <ErrorBoundary>
- *   <YourComponent />
- * </ErrorBoundary>
- */
-export class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
-> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    logError(error, "React Error Boundary");
-    this.props.onError?.(error, errorInfo);
-  }
-
-  render(): React.ReactNode {
-    if (this.state.hasError) {
-      return (
-        this.props.fallback || (
-          <div style={{ padding: 20, textAlign: "center" }}>
-            <h2>Something went wrong</h2>
-            <p>{this.state.error?.message}</p>
-            <button onClick={() => this.setState({ hasError: false, error: null })}>
-              Try Again
-            </button>
-          </div>
-        )
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 // ============================================================================
 // 📤 EXPORT DEFAULT CONFIG
