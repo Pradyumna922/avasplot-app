@@ -182,10 +182,8 @@ export const PROPERTY_TYPES = [
     'agricultural',
     'industrial',
     'farm house',
-    'flat / apartment',
     'villa',
     'office space',
-    'shop / showroom',
     'warehouse',
 ] as const;
 

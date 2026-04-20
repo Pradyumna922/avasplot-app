@@ -58,7 +58,7 @@ export default function PostScreen() {
     // Step 1 State
     const [listingType, setListingType] = useState<'For Sale' | 'For Rent'>('For Sale');
     const [type, setType] = useState('');
-    const [title, setTitle] = useState('');
+    const [title, setTitle] = useState('100 sq.ft plot in mumbai');
     const [price, setPrice] = useState('');
     const [area, setArea] = useState('');
     const [vastu, setVastu] = useState('');

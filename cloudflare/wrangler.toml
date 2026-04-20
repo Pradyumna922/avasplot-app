@@ -1,0 +1,18 @@
+# ============================================================================
+# ☁️ CLOUDFLARE WRANGLER CONFIG
+# ============================================================================
+# Deploy with: npx wrangler deploy
+# ============================================================================
+
+name = "avasplot-rate-limiter"
+main = "worker-rate-limit.ts"
+compatibility_date = "2024-01-01"
+
+# Free tier KV namespace for rate limiting
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "YOUR_KV_NAMESPACE_ID"  # Replace after creating: wrangler kv:namespace create RATE_LIMIT_KV
+
+# Environment variables (optional)
+# [vars]
+# ENVIRONMENT = "production"
